@@ -69,10 +69,10 @@ function updateSectionItemResponse(
   });
 }
 
-function updateSectionItemAction(
+function updateSectionItemActions(
   items: AuditSectionItem[],
   itemId: string,
-  action: AuditLinkedAction | null,
+  actions: AuditLinkedAction[],
 ): AuditSectionItem[] {
   return items.map((entry) => {
     if (entry.kind === "atomic" && entry.item.id === itemId) {
@@ -80,7 +80,7 @@ function updateSectionItemAction(
         ...entry,
         item: {
           ...entry.item,
-          action,
+          actions,
         },
       };
     }
@@ -97,7 +97,7 @@ function updateSectionItemAction(
       const subQuestions = [...entry.subQuestions];
       subQuestions[subQuestionIndex] = {
         ...subQuestions[subQuestionIndex],
-        action,
+        actions,
       };
 
       return {
@@ -124,6 +124,7 @@ export function AuditWizard({
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
   const [actionDialog, setActionDialog] = useState<ActionDialogState | null>(null);
   const [savingAction, setSavingAction] = useState(false);
+  const [deletingActionId, setDeletingActionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refreshOverview = useCallback(async () => {
@@ -189,7 +190,7 @@ export function AuditWizard({
           response: payload.response,
           notes: payload.notes || null,
           recordedDate: payload.recordedDate || null,
-          needsAction: payload.needsAction,
+          needsAction: false,
         }),
       });
 
@@ -261,7 +262,6 @@ export function AuditWizard({
                   priority: input.priority,
                   dueDate: input.dueDate || null,
                   itemId: actionDialog.item.id,
-                  sectionId: sectionData?.section.id ?? activeSectionId,
                 },
           ),
         },
@@ -274,16 +274,20 @@ export function AuditWizard({
       }
 
       const linkedAction = result.data as AuditLinkedAction;
+      const itemId = actionDialog.item.id;
+      const currentActions = actionDialog.item.actions;
+
+      const nextActions = isEditing
+        ? currentActions.map((action) =>
+            action.id === linkedAction.id ? linkedAction : action,
+          )
+        : [...currentActions, linkedAction];
 
       setSectionData((current) => {
         if (!current) return current;
         return {
           ...current,
-          items: updateSectionItemAction(
-            current.items,
-            actionDialog.item.id,
-            linkedAction,
-          ),
+          items: updateSectionItemActions(current.items, itemId, nextActions),
         };
       });
 
@@ -294,9 +298,60 @@ export function AuditWizard({
     }
   }
 
+  async function handleDeleteAction(
+    item: AuditItemWithResponse,
+    action: AuditLinkedAction,
+  ) {
+    if (!window.confirm(`Delete action "${action.title}"?`)) {
+      return;
+    }
+
+    setDeletingActionId(action.id);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/actions/${action.id}`, {
+        method: "DELETE",
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error ?? "Failed to delete action");
+      }
+
+      const nextActions = item.actions.filter((entry) => entry.id !== action.id);
+
+      setSectionData((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          items: updateSectionItemActions(current.items, item.id, nextActions),
+        };
+      });
+
+      await refreshOverview();
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Failed to delete action",
+      );
+    } finally {
+      setDeletingActionId(null);
+    }
+  }
+
   const activeSection = overview.sections.find(
     (section) => section.id === activeSectionId,
   );
+
+  const actionHandlers = {
+    onAddAction: (item: AuditItemWithResponse) =>
+      setActionDialog({ item, existingAction: null }),
+    onEditAction: (item: AuditItemWithResponse, action: AuditLinkedAction) =>
+      setActionDialog({ item, existingAction: action }),
+    onDeleteAction: handleDeleteAction,
+  };
 
   return (
     <div className="space-y-6">
@@ -359,6 +414,7 @@ export function AuditWizard({
                     group={entry}
                     sectionId={sectionData.section.id}
                     savingItemId={savingItemId}
+                    deletingActionId={deletingActionId}
                     onSave={async (itemId, sectionId, payload) => {
                       try {
                         await saveQuestion(itemId, sectionId, payload);
@@ -371,15 +427,7 @@ export function AuditWizard({
                         throw saveError;
                       }
                     }}
-                    onRaiseAction={(item) =>
-                      setActionDialog({ item, existingAction: null })
-                    }
-                    onEditAction={(item) =>
-                      setActionDialog({
-                        item,
-                        existingAction: item.action,
-                      })
-                    }
+                    {...actionHandlers}
                   />
                 ) : (
                   <QuestionCard
@@ -387,6 +435,7 @@ export function AuditWizard({
                     item={entry.item}
                     sectionId={sectionData.section.id}
                     saving={savingItemId === entry.item.id}
+                    deletingActionId={deletingActionId}
                     onSave={async (itemId, sectionId, payload) => {
                       try {
                         await saveQuestion(itemId, sectionId, payload);
@@ -399,15 +448,7 @@ export function AuditWizard({
                         throw saveError;
                       }
                     }}
-                    onRaiseAction={(item) =>
-                      setActionDialog({ item, existingAction: null })
-                    }
-                    onEditAction={(item) =>
-                      setActionDialog({
-                        item,
-                        existingAction: item.action,
-                      })
-                    }
+                    {...actionHandlers}
                   />
                 ),
               )}

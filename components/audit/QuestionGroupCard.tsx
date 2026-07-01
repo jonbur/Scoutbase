@@ -6,19 +6,22 @@ import { QuestionCard } from "@/components/audit/QuestionCard";
 import type {
   AuditGroupSectionItem,
   AuditItemWithResponse,
+  AuditLinkedAction,
 } from "@/types/audit";
 
 type QuestionGroupCardProps = {
   group: AuditGroupSectionItem;
   sectionId: string;
   savingItemId: string | null;
+  deletingActionId?: string | null;
   onSave: (
     itemId: string,
     sectionId: string,
     payload: QuestionSavePayload,
   ) => Promise<void>;
-  onRaiseAction: (item: AuditItemWithResponse) => void;
-  onEditAction: (item: AuditItemWithResponse) => void;
+  onAddAction: (item: AuditItemWithResponse) => void;
+  onEditAction: (item: AuditItemWithResponse, action: AuditLinkedAction) => void;
+  onDeleteAction: (item: AuditItemWithResponse, action: AuditLinkedAction) => void;
 };
 
 function toQuestionItem(
@@ -33,7 +36,7 @@ function toQuestionItem(
     documentType: subQuestion.documentType,
     profileFlag: subQuestion.profileFlag,
     response: subQuestion.response,
-    action: subQuestion.action,
+    actions: subQuestion.actions,
   };
 }
 
@@ -41,9 +44,11 @@ export function QuestionGroupCard({
   group,
   sectionId,
   savingItemId,
+  deletingActionId = null,
   onSave,
-  onRaiseAction,
+  onAddAction,
   onEditAction,
+  onDeleteAction,
 }: QuestionGroupCardProps) {
   const questionItems = useMemo(
     () => group.subQuestions.map((subQuestion) => toQuestionItem(subQuestion)),
@@ -67,9 +72,11 @@ export function QuestionGroupCard({
             sectionId={sectionId}
             variant="sub"
             saving={savingItemId === item.id}
+            deletingActionId={deletingActionId}
             onSave={onSave}
-            onRaiseAction={onRaiseAction}
+            onAddAction={onAddAction}
             onEditAction={onEditAction}
+            onDeleteAction={onDeleteAction}
           />
         ))}
       </div>

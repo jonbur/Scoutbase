@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Priority } from "@prisma/client";
 import { requireAuthContext } from "@/lib/auth";
-import { serializeLinkedAction, updateAuditAction } from "@/lib/audit";
+import { serializeLinkedAction, updateAuditAction, deleteAuditAction } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 
 type RouteParams = { params: { actionId: string } };
@@ -76,6 +76,26 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to update action";
+    const status =
+      message === "Unauthorized"
+        ? 401
+        : message === "Action not found"
+          ? 404
+          : 500;
+
+    return NextResponse.json({ data: null, error: message }, { status });
+  }
+}
+
+export async function DELETE(_request: Request, { params }: RouteParams) {
+  try {
+    const auth = await requireAuthContext();
+    await deleteAuditAction(params.actionId, auth.organisationId);
+
+    return NextResponse.json({ data: { deleted: true }, error: null });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to delete action";
     const status =
       message === "Unauthorized"
         ? 401

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { AuditItemWithResponse } from "@/types/audit";
+import type { AuditItemWithResponse, AuditLinkedAction } from "@/types/audit";
 import {
   isPrimaryResponse,
   ResponseInput,
   type PrimaryResponseValue,
 } from "@/components/audit/ResponseInput";
-import { DateField, ToggleField } from "@/components/ui/form";
+import { ItemActionPanel } from "@/components/audit/ItemActionPanel";
+import { DateField } from "@/components/ui/form";
 import { formatInputDate, isInputDate } from "@/lib/dates";
 import {
   isDateUploadItem,
@@ -16,7 +17,6 @@ import {
 
 export type QuestionSavePayload = {
   response: PrimaryResponseValue | "NA";
-  needsAction: boolean;
   notes: string;
   recordedDate?: string | null;
 };
@@ -26,13 +26,15 @@ type QuestionCardProps = {
   sectionId: string;
   saving: boolean;
   variant?: "default" | "sub";
+  deletingActionId?: string | null;
   onSave: (
     itemId: string,
     sectionId: string,
     payload: QuestionSavePayload,
   ) => Promise<void>;
-  onRaiseAction: (item: AuditItemWithResponse) => void;
-  onEditAction: (item: AuditItemWithResponse) => void;
+  onAddAction: (item: AuditItemWithResponse) => void;
+  onEditAction: (item: AuditItemWithResponse, action: AuditLinkedAction) => void;
+  onDeleteAction: (item: AuditItemWithResponse, action: AuditLinkedAction) => void;
 };
 
 function normalizeStoredResponse(item: AuditItemWithResponse) {
@@ -41,7 +43,6 @@ function normalizeStoredResponse(item: AuditItemWithResponse) {
   if (isDateUploadItem(item)) {
     return {
       response: null as PrimaryResponseValue | null,
-      needsAction: false,
       notes: "",
       recordedDate: formatInputDate(stored?.recordedDate),
     };
@@ -50,7 +51,6 @@ function normalizeStoredResponse(item: AuditItemWithResponse) {
   if (isOpenTextItem(item)) {
     return {
       response: null as PrimaryResponseValue | null,
-      needsAction: false,
       notes: stored?.notes ?? "",
       recordedDate: "",
     };
@@ -59,7 +59,6 @@ function normalizeStoredResponse(item: AuditItemWithResponse) {
   if (!stored) {
     return {
       response: null as PrimaryResponseValue | null,
-      needsAction: false,
       notes: "",
       recordedDate: "",
     };
@@ -67,8 +66,7 @@ function normalizeStoredResponse(item: AuditItemWithResponse) {
 
   if (stored.response === "ACTION_NEEDED") {
     return {
-      response: null as PrimaryResponseValue | null,
-      needsAction: true,
+      response: "NO" as PrimaryResponseValue,
       notes: stored.notes ?? "",
       recordedDate: "",
     };
@@ -76,7 +74,6 @@ function normalizeStoredResponse(item: AuditItemWithResponse) {
 
   return {
     response: isPrimaryResponse(stored.response) ? stored.response : null,
-    needsAction: stored.needsAction,
     notes: stored.notes ?? "",
     recordedDate: "",
   };
@@ -112,7 +109,6 @@ function storedResponseKey(item: AuditItemWithResponse): string {
   return [
     item.response.id,
     item.response.response,
-    item.response.needsAction,
     item.response.notes ?? "",
     item.response.recordedDate ?? "",
   ].join(":");
@@ -123,15 +119,16 @@ export function QuestionCard({
   sectionId,
   saving,
   variant = "default",
+  deletingActionId = null,
   onSave,
-  onRaiseAction,
+  onAddAction,
   onEditAction,
+  onDeleteAction,
 }: QuestionCardProps) {
   const initial = normalizeStoredResponse(item);
   const [response, setResponse] = useState<PrimaryResponseValue | null>(
     initial.response,
   );
-  const [needsAction, setNeedsAction] = useState(initial.needsAction);
   const [notes, setNotes] = useState(initial.notes);
   const [recordedDate, setRecordedDate] = useState(initial.recordedDate);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -139,7 +136,6 @@ export function QuestionCard({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stateRef = useRef({
     response: initial.response,
-    needsAction: initial.needsAction,
     notes: initial.notes,
     recordedDate: initial.recordedDate,
   });
@@ -149,9 +145,8 @@ export function QuestionCard({
 
   const isOpenTextQuestion = isOpenTextItem(item);
   const isDateQuestion = isDateUploadItem(item);
-  const linkedAction = item.action;
 
-  stateRef.current = { response, needsAction, notes, recordedDate };
+  stateRef.current = { response, notes, recordedDate };
   onSaveRef.current = onSave;
   itemRef.current = item;
 
@@ -160,7 +155,6 @@ export function QuestionCard({
   useEffect(() => {
     const next = normalizeStoredResponse(item);
     setResponse(next.response);
-    setNeedsAction(next.needsAction);
     if (!inputFocusedRef.current) {
       setNotes(next.notes);
       setRecordedDate(next.recordedDate);
@@ -182,29 +176,26 @@ export function QuestionCard({
         if (current.recordedDate.trim() && isInputDate(current.recordedDate)) {
           payload = {
             response: "NA",
-            needsAction: false,
             notes: "",
             recordedDate: current.recordedDate,
           };
         }
       } else if (isOpenTextItem(currentItem)) {
         if (current.notes.trim()) {
-          payload = { response: "NA", needsAction: false, notes: current.notes };
+          payload = { response: "NA", notes: current.notes };
         }
       } else if (current.response === "YES" && current.notes.trim()) {
         payload = {
           response: "YES",
-          needsAction: current.needsAction,
           notes: current.notes,
         };
       } else if (current.response === "NO") {
         payload = {
           response: "NO",
-          needsAction: current.needsAction,
           notes: "",
         };
       } else if (current.response === "NA") {
-        payload = { response: "NA", needsAction: false, notes: "" };
+        payload = { response: "NA", notes: "" };
       }
 
       if (payload && canSave(currentItem, payload) === null) {
@@ -213,7 +204,6 @@ export function QuestionCard({
     };
   }, [item.id, sectionId]);
 
-  const showNeedsAction = !isOpenTextQuestion && !isDateQuestion && (response === "YES" || response === "NO");
   const showYesDetails = !isOpenTextQuestion && !isDateQuestion && response === "YES";
 
   async function persist(next: QuestionSavePayload) {
@@ -243,20 +233,18 @@ export function QuestionCard({
 
   async function handleResponseChange(nextResponse: PrimaryResponseValue) {
     const nextNotes = nextResponse === "YES" ? notes : "";
-    const nextNeedsAction = nextResponse === "NA" ? false : needsAction;
 
     setResponse(nextResponse);
 
     if (nextResponse === "NA") {
-      setNeedsAction(false);
       setNotes("");
-      await persist({ response: "NA", needsAction: false, notes: "" });
+      await persist({ response: "NA", notes: "" });
       return;
     }
 
     if (nextResponse === "NO") {
       setNotes("");
-      await persist({ response: "NO", needsAction: nextNeedsAction, notes: "" });
+      await persist({ response: "NO", notes: "" });
       return;
     }
 
@@ -265,30 +253,28 @@ export function QuestionCard({
     if (nextNotes.trim()) {
       await persist({
         response: "YES",
-        needsAction: nextNeedsAction,
         notes: nextNotes,
       });
     }
   }
 
-  async function handleNeedsActionChange(checked: boolean) {
-    if (!response || response === "NA") return;
-
-    const next = { response, needsAction: checked, notes };
-    setNeedsAction(checked);
-    await persist(next);
-  }
-
   function handleNotesChange(value: string) {
     setNotes(value);
-    scheduleSave({ response: "NA", needsAction: false, notes: value });
+
+    if (isOpenTextQuestion) {
+      scheduleSave({ response: "NA", notes: value });
+      return;
+    }
+
+    if (response === "YES") {
+      scheduleSave({ response: "YES", notes: value });
+    }
   }
 
   function handleDateChange(value: string) {
     setRecordedDate(value);
     scheduleSave({
       response: "NA",
-      needsAction: false,
       notes: "",
       recordedDate: value,
     });
@@ -307,12 +293,12 @@ export function QuestionCard({
     }
 
     if (isOpenTextQuestion) {
-      await persist({ response: "NA", needsAction: false, notes });
+      await persist({ response: "NA", notes });
       return;
     }
 
     if (response !== "YES") return;
-    await persist({ response, needsAction, notes });
+    await persist({ response, notes });
   }
 
   async function handleDateBlur() {
@@ -326,7 +312,6 @@ export function QuestionCard({
     if (!isDateQuestion) return;
     await persist({
       response: "NA",
-      needsAction: false,
       notes: "",
       recordedDate,
     });
@@ -419,17 +404,6 @@ export function QuestionCard({
               />
             </div>
           ) : null}
-
-          {showNeedsAction ? (
-            <div className="mt-4">
-              <ToggleField
-                label="Needs action"
-                description="Tick if a follow-up task should be tracked for this item."
-                checked={needsAction}
-                onChange={handleNeedsActionChange}
-              />
-            </div>
-          ) : null}
         </>
       )}
 
@@ -437,32 +411,13 @@ export function QuestionCard({
         <p className="mt-3 text-sm text-red-600">{validationError}</p>
       ) : null}
 
-      {(needsAction || linkedAction) && response && response !== "NA" && !isOpenTextQuestion && !isDateQuestion ? (
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-          <p className="text-sm text-amber-900">
-            {linkedAction
-              ? "An action has been raised for this item."
-              : "Raise an action to track the follow-up."}
-          </p>
-          {linkedAction ? (
-            <button
-              type="button"
-              onClick={() => onEditAction(item)}
-              className="shrink-0 text-sm font-medium text-amber-900 underline underline-offset-2 hover:text-amber-950"
-            >
-              Edit action
-            </button>
-          ) : needsAction ? (
-            <button
-              type="button"
-              onClick={() => onRaiseAction(item)}
-              className="shrink-0 rounded-lg bg-amber-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-800"
-            >
-              Raise action
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+      <ItemActionPanel
+        item={item}
+        deletingActionId={deletingActionId}
+        onAddAction={onAddAction}
+        onEditAction={onEditAction}
+        onDeleteAction={onDeleteAction}
+      />
     </article>
   );
 }

@@ -490,7 +490,6 @@ export type CreateAuditActionInput = {
   priority: Priority;
   dueDate?: string | null;
   itemId: string;
-  sectionId: string;
 };
 
 export async function createAuditAction(
@@ -505,7 +504,7 @@ export async function createAuditAction(
     throw new Error("Audit not found");
   }
 
-  const action = await prisma.action.create({
+  return prisma.action.create({
     data: {
       premisesId: audit.premisesId,
       title: input.title,
@@ -519,33 +518,6 @@ export async function createAuditAction(
       createdBy: userId,
     },
   });
-
-  const existing = await prisma.auditResponse.findUnique({
-    where: {
-      auditId_itemId: { auditId, itemId: input.itemId },
-    },
-  });
-
-  const response =
-    existing?.response === ResponseValue.YES ||
-    existing?.response === ResponseValue.NO
-      ? existing.response
-      : ResponseValue.NO;
-
-  await saveAuditResponse(
-    auditId,
-    organisationId,
-    userId,
-    input.itemId,
-    input.sectionId,
-    response,
-    {
-      notes: existing?.notes ?? input.description ?? null,
-      needsAction: true,
-    },
-  );
-
-  return action;
 }
 
 export function serializeLinkedAction(action: Action): AuditLinkedAction {
@@ -561,22 +533,29 @@ export function serializeLinkedAction(action: Action): AuditLinkedAction {
 
 async function getAuditActionsByItemId(
   auditId: string,
-): Promise<Map<string, Action>> {
+): Promise<Map<string, Action[]>> {
   const actions = await prisma.action.findMany({
     where: {
       sourceType: ActionSourceType.AUDIT,
       sourceRef: auditId,
       sourceItemId: { not: null },
     },
+    orderBy: { createdAt: "asc" },
   });
 
-  return new Map(
-    actions
-      .filter((action): action is Action & { sourceItemId: string } =>
-        Boolean(action.sourceItemId),
-      )
-      .map((action) => [action.sourceItemId, action]),
-  );
+  const grouped = new Map<string, Action[]>();
+
+  for (const action of actions) {
+    if (!action.sourceItemId) {
+      continue;
+    }
+
+    const existing = grouped.get(action.sourceItemId) ?? [];
+    existing.push(action);
+    grouped.set(action.sourceItemId, existing);
+  }
+
+  return grouped;
 }
 
 export type UpdateAuditActionInput = {
@@ -610,6 +589,26 @@ export async function updateAuditAction(
       priority: input.priority,
       dueDate: input.dueDate ? new Date(input.dueDate) : null,
     },
+  });
+}
+
+export async function deleteAuditAction(
+  actionId: string,
+  organisationId: string,
+): Promise<void> {
+  const existing = await prisma.action.findFirst({
+    where: {
+      id: actionId,
+      premises: { organisationId },
+    },
+  });
+
+  if (!existing) {
+    throw new Error("Action not found");
+  }
+
+  await prisma.action.delete({
+    where: { id: actionId },
   });
 }
 
@@ -652,10 +651,8 @@ export async function buildAuditSectionPayload(
     };
   };
 
-  const toLinkedAction = (itemId: string): AuditLinkedAction | null => {
-    const action = actionsByItemId.get(itemId);
-    return action ? serializeLinkedAction(action) : null;
-  };
+  const toLinkedActions = (itemId: string): AuditLinkedAction[] =>
+    (actionsByItemId.get(itemId) ?? []).map(serializeLinkedAction);
 
   return {
     section: {
@@ -674,7 +671,7 @@ export async function buildAuditSectionPayload(
           subQuestions: item.subQuestions.map((subQuestion) => ({
             ...subQuestion,
             response: toResponseRecord(subQuestion.id),
-            action: toLinkedAction(subQuestion.id),
+            actions: toLinkedActions(subQuestion.id),
           })),
         };
       }
@@ -684,7 +681,7 @@ export async function buildAuditSectionPayload(
         item: {
           ...item,
           response: toResponseRecord(item.id),
-          action: toLinkedAction(item.id),
+          actions: toLinkedActions(item.id),
         },
       };
     }),

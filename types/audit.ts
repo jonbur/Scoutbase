@@ -52,7 +52,7 @@ export type AuditItemWithResponse = {
   documentType?: string;
   profileFlag?: string;
   response: AuditResponseRecord | null;
-  action: AuditLinkedAction | null;
+  actions: AuditLinkedAction[];
 };
 
 export type AuditSubQuestionWithResponse = {
@@ -63,7 +63,7 @@ export type AuditSubQuestionWithResponse = {
   documentType?: string;
   profileFlag?: string;
   response: AuditResponseRecord | null;
-  action: AuditLinkedAction | null;
+  actions: AuditLinkedAction[];
 };
 
 export type AuditAtomicSectionItem = {

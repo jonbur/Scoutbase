@@ -17,13 +17,12 @@ export async function POST(request: Request, { params }: RouteParams) {
     const priority = body?.priority as string | undefined;
     const dueDate = body?.dueDate as string | null | undefined;
     const itemId = body?.itemId as string | undefined;
-    const sectionId = body?.sectionId as string | undefined;
 
-    if (!title || !priority || !itemId || !sectionId) {
+    if (!title || !priority || !itemId) {
       return NextResponse.json(
         {
           data: null,
-          error: "title, priority, itemId, and sectionId are required",
+          error: "title, priority, and itemId are required",
         },
         { status: 400 },
       );
@@ -46,7 +45,6 @@ export async function POST(request: Request, { params }: RouteParams) {
         priority: priority as Priority,
         dueDate,
         itemId,
-        sectionId,
       },
     );
 
