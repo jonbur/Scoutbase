@@ -12,14 +12,20 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getPremisesForOrganisation } from "@/lib/premises";
-import { filterApplicableItems, isTextResponseComplete } from "@/lib/audit-items";
+import {
+  filterApplicableItems,
+  findAnswerableItem,
+  getAnswerableItems,
+  isTextResponseComplete,
+} from "@/lib/audit-items";
 import { computeApplicableSections } from "@/lib/sections";
 import type {
   AuditTemplateItem,
   AuditTemplateSection,
   AuditTemplateSections,
+  AnswerableAuditItem,
 } from "@/types/audit-template";
-import { isTextAnswerItem } from "@/types/audit-template";
+import { isGroupItem, isTextAnswerItem } from "@/types/audit-template";
 
 export type AuditWithRelations = Audit & {
   sections: AuditSection[];
@@ -284,7 +290,7 @@ export async function startOrResumeAudit(
 
 function isResponseComplete(
   response: AuditResponse,
-  item?: AuditTemplateItem,
+  item?: AnswerableAuditItem,
 ): boolean {
   if (item && isTextAnswerItem(item)) {
     return isTextResponseComplete(item, response.notes);
@@ -304,7 +310,7 @@ function isResponseComplete(
 
 function countCompleteResponses(
   responses: AuditResponse[],
-  items: AuditTemplateItem[],
+  items: AnswerableAuditItem[],
 ): number {
   const itemsById = new Map(items.map((item) => [item.id, item]));
   return responses.filter((response) => {
@@ -325,8 +331,9 @@ async function refreshSectionStatus(
   }
 
   const applicableItems = getApplicableItemsForSection(section, profile);
+  const answerableItems = getAnswerableItems(applicableItems);
 
-  if (applicableItems.length === 0) {
+  if (answerableItems.length === 0) {
     await prisma.auditSection.updateMany({
       where: { auditId, sectionId },
       data: { status: AuditSectionStatus.SKIPPED },
@@ -337,16 +344,16 @@ async function refreshSectionStatus(
   const responses = await prisma.auditResponse.findMany({
     where: {
       auditId,
-      itemId: { in: applicableItems.map((item) => item.id) },
+      itemId: { in: answerableItems.map((item) => item.id) },
     },
   });
 
-  const answeredCount = countCompleteResponses(responses, applicableItems);
+  const answeredCount = countCompleteResponses(responses, answerableItems);
   let status: AuditSectionStatus;
 
   if (answeredCount === 0) {
     status = AuditSectionStatus.NOT_STARTED;
-  } else if (answeredCount < applicableItems.length) {
+  } else if (answeredCount < answerableItems.length) {
     status = AuditSectionStatus.IN_PROGRESS;
   } else {
     status = AuditSectionStatus.COMPLETE;
@@ -398,7 +405,7 @@ export async function saveAuditResponse(
   }
 
   const applicableItems = getApplicableItemsForSection(section, profile);
-  const item = applicableItems.find((entry) => entry.id === itemId);
+  const item = findAnswerableItem(applicableItems, itemId);
 
   if (!item) {
     throw new Error("Question not found in this section");
@@ -552,6 +559,18 @@ export function buildAuditSectionPayload(
     )
     .map((response) => response.itemId);
 
+  const toResponseRecord = (itemId: string) => {
+    const response = responsesByItemId[itemId];
+    if (!response) return null;
+
+    return {
+      id: response.id,
+      response: response.response,
+      needsAction: response.needsAction,
+      notes: response.notes,
+    };
+  };
+
   return {
     section: {
       id: section.id,
@@ -559,10 +578,28 @@ export function buildAuditSectionPayload(
       title: section.title,
       status: sectionRecord?.status ?? AuditSectionStatus.NOT_STARTED,
     },
-    items: items.map((item) => ({
-      ...item,
-      response: responsesByItemId[item.id] ?? null,
-    })),
+    items: items.map((item) => {
+      if (isGroupItem(item)) {
+        return {
+          kind: "group" as const,
+          id: item.id,
+          label: item.label,
+          guidance: item.guidance,
+          subQuestions: item.subQuestions.map((subQuestion) => ({
+            ...subQuestion,
+            response: toResponseRecord(subQuestion.id),
+          })),
+        };
+      }
+
+      return {
+        kind: "atomic" as const,
+        item: {
+          ...item,
+          response: toResponseRecord(item.id),
+        },
+      };
+    }),
     actionItemIds,
   };
 }
@@ -586,13 +623,14 @@ export function buildAuditOverview(audit: AuditWithRelations) {
         templateSection,
         profile,
       );
-      const itemCount = applicableItems.length;
-      const applicableIds = new Set(applicableItems.map((item) => item.id));
+      const answerableItems = getAnswerableItems(applicableItems);
+      const itemCount = answerableItems.length;
+      const applicableIds = new Set(answerableItems.map((item) => item.id));
       const answeredCount = countCompleteResponses(
         audit.responses.filter((response) =>
           applicableIds.has(response.itemId),
         ),
-        applicableItems,
+        answerableItems,
       );
 
       return {

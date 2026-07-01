@@ -31,7 +31,7 @@ async function main() {
 
   console.log(`Audit template seeded: ${template.version} (${template.id})`);
   console.log(
-    `  Sections: ${auditTemplate202509.length}, Items: ${auditTemplate202509.reduce((n, s) => n + s.items.length, 0)}`,
+    `  Sections: ${auditTemplate202509.length}, Top-level items: ${auditTemplate202509.reduce((n, s) => n + s.items.length, 0)}, Answerable questions: ${auditTemplate202509.reduce((n, s) => n + s.items.reduce((count, item) => count + (item.responseType === "GROUP" ? item.subQuestions.length : 1), 0), 0)}`,
   );
 
   const organisation = await prisma.organisation.upsert({

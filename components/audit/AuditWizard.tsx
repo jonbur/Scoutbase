@@ -6,10 +6,12 @@ import type { Priority } from "@prisma/client";
 import type { QuestionSavePayload } from "@/components/audit/QuestionCard";
 import { ActionRaiseForm } from "@/components/audit/ActionRaiseForm";
 import { QuestionCard } from "@/components/audit/QuestionCard";
+import { QuestionGroupCard } from "@/components/audit/QuestionGroupCard";
 import { SectionNav } from "@/components/audit/SectionNav";
 import type {
   AuditItemWithResponse,
   AuditOverview,
+  AuditSectionItem,
   AuditSectionPayload,
 } from "@/types/audit";
 
@@ -19,6 +21,47 @@ type AuditWizardProps = {
   initialOverview: AuditOverview;
   initialSectionId: string;
 };
+
+function updateSectionItemResponse(
+  items: AuditSectionItem[],
+  itemId: string,
+  response: NonNullable<AuditItemWithResponse["response"]>,
+): AuditSectionItem[] {
+  return items.map((entry) => {
+    if (entry.kind === "atomic" && entry.item.id === itemId) {
+      return {
+        ...entry,
+        item: {
+          ...entry.item,
+          response,
+        },
+      };
+    }
+
+    if (entry.kind === "group") {
+      const subQuestionIndex = entry.subQuestions.findIndex(
+        (subQuestion) => subQuestion.id === itemId,
+      );
+
+      if (subQuestionIndex === -1) {
+        return entry;
+      }
+
+      const subQuestions = [...entry.subQuestions];
+      subQuestions[subQuestionIndex] = {
+        ...subQuestions[subQuestionIndex],
+        response,
+      };
+
+      return {
+        ...entry,
+        subQuestions,
+      };
+    }
+
+    return entry;
+  });
+}
 
 export function AuditWizard({
   premisesId,
@@ -108,6 +151,13 @@ export function AuditWizard({
         throw new Error(result.error ?? "Failed to save response");
       }
 
+      const savedResponse = {
+        id: result.data.response.id,
+        response: result.data.response.response,
+        needsAction: result.data.response.needsAction,
+        notes: result.data.response.notes,
+      };
+
       setSectionData((current) => {
         if (!current) return current;
         return {
@@ -116,19 +166,7 @@ export function AuditWizard({
             ...current.section,
             status: result.data.sectionStatus,
           },
-          items: current.items.map((item) =>
-            item.id === itemId
-              ? {
-                  ...item,
-                  response: {
-                    id: result.data.response.id,
-                    response: result.data.response.response,
-                    needsAction: result.data.response.needsAction,
-                    notes: result.data.response.notes,
-                  },
-                }
-              : item,
-          ),
+          items: updateSectionItemResponse(current.items, itemId, savedResponse),
         };
       });
 
@@ -248,27 +286,49 @@ export function AuditWizard({
             <p className="text-sm text-slate-500">Loading questions…</p>
           ) : sectionData ? (
             <div className="space-y-4">
-              {sectionData.items.map((item) => (
-                <QuestionCard
-                  key={item.id}
-                  item={item}
-                  saving={savingItemId === item.id}
-                  hasAction={actionItemIds.includes(item.id)}
-                  onSave={async (itemId, payload) => {
-                    try {
-                      await saveQuestion(itemId, payload);
-                    } catch (saveError) {
-                      setError(
-                        saveError instanceof Error
-                          ? saveError.message
-                          : "Failed to save response",
-                      );
-                      throw saveError;
-                    }
-                  }}
-                  onRaiseAction={setActionItem}
-                />
-              ))}
+              {sectionData.items.map((entry) =>
+                entry.kind === "group" ? (
+                  <QuestionGroupCard
+                    key={entry.id}
+                    group={entry}
+                    savingItemId={savingItemId}
+                    actionItemIds={actionItemIds}
+                    onSave={async (itemId, payload) => {
+                      try {
+                        await saveQuestion(itemId, payload);
+                      } catch (saveError) {
+                        setError(
+                          saveError instanceof Error
+                            ? saveError.message
+                            : "Failed to save response",
+                        );
+                        throw saveError;
+                      }
+                    }}
+                    onRaiseAction={setActionItem}
+                  />
+                ) : (
+                  <QuestionCard
+                    key={entry.item.id}
+                    item={entry.item}
+                    saving={savingItemId === entry.item.id}
+                    hasAction={actionItemIds.includes(entry.item.id)}
+                    onSave={async (itemId, payload) => {
+                      try {
+                        await saveQuestion(itemId, payload);
+                      } catch (saveError) {
+                        setError(
+                          saveError instanceof Error
+                            ? saveError.message
+                            : "Failed to save response",
+                        );
+                        throw saveError;
+                      }
+                    }}
+                    onRaiseAction={setActionItem}
+                  />
+                ),
+              )}
             </div>
           ) : null}
         </section>

@@ -1,18 +1,31 @@
 import type {
+  AuditSubQuestion,
   AuditTemplateItem,
   AuditTemplateSection,
   AuditTemplateSections,
+  AnswerableResponseType,
 } from "@/types/audit-template";
 import { AUDIT_TEMPLATE_V2025_09 } from "./audit-template-2025-09";
 
-type RawItem = {
+type RawSubQuestion = {
   id: string;
   question: string;
+  responseType: AnswerableResponseType;
+  requiresDocument: boolean;
+  documentType?: string;
+  profileFlag?: string;
+};
+
+type RawItem = {
+  id: string;
+  question?: string;
+  label?: string;
   guidance: string | null;
   responseType: AuditTemplateItem["responseType"];
   requiresDocument: boolean;
   profileFlag?: string;
   documentType?: string;
+  subQuestions?: readonly RawSubQuestion[];
 };
 
 type RawSubsection = {
@@ -31,10 +44,33 @@ type RawSection = {
   subsections?: readonly RawSubsection[];
 };
 
-function normalizeItem(item: RawItem): AuditTemplateItem {
+function normalizeSubQuestion(item: RawSubQuestion): AuditSubQuestion {
   return {
     id: item.id,
     question: item.question,
+    responseType: item.responseType,
+    requiresDocument: item.requiresDocument,
+    documentType: item.documentType,
+    profileFlag: item.profileFlag,
+  };
+}
+
+function normalizeItem(item: RawItem): AuditTemplateItem {
+  if (item.responseType === "GROUP") {
+    return {
+      id: item.id,
+      label: item.label ?? item.question ?? "",
+      guidance: item.guidance ?? "",
+      responseType: "GROUP",
+      requiresDocument: false,
+      profileFlag: item.profileFlag,
+      subQuestions: (item.subQuestions ?? []).map(normalizeSubQuestion),
+    };
+  }
+
+  return {
+    id: item.id,
+    question: item.question ?? "",
     guidance: item.guidance ?? "",
     responseType: item.responseType,
     requiresDocument: item.requiresDocument,

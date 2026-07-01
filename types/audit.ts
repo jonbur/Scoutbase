@@ -1,4 +1,5 @@
 import type { AuditSectionStatus, ResponseValue } from "@prisma/client";
+import type { AnswerableResponseType } from "@/types/audit-template";
 
 export type AuditSectionSummary = {
   id: string;
@@ -25,21 +26,50 @@ export type AuditOverview = {
   };
 };
 
+export type AuditResponseRecord = {
+  id: string;
+  response: ResponseValue;
+  needsAction: boolean;
+  notes: string | null;
+};
+
 export type AuditItemWithResponse = {
   id: string;
   question: string;
   guidance: string;
-  responseType: "YES_NO_NA_ACTION" | "OPEN_TEXT" | "DATE_UPLOAD";
+  responseType: AnswerableResponseType;
   requiresDocument: boolean;
   documentType?: string;
   profileFlag?: string;
-  response: {
-    id: string;
-    response: ResponseValue;
-    needsAction: boolean;
-    notes: string | null;
-  } | null;
+  response: AuditResponseRecord | null;
 };
+
+export type AuditSubQuestionWithResponse = {
+  id: string;
+  question: string;
+  responseType: AnswerableResponseType;
+  requiresDocument: boolean;
+  documentType?: string;
+  profileFlag?: string;
+  response: AuditResponseRecord | null;
+};
+
+export type AuditAtomicSectionItem = {
+  kind: "atomic";
+  item: AuditItemWithResponse;
+};
+
+export type AuditGroupSectionItem = {
+  kind: "group";
+  id: string;
+  label: string;
+  guidance: string;
+  subQuestions: AuditSubQuestionWithResponse[];
+};
+
+export type AuditSectionItem =
+  | AuditAtomicSectionItem
+  | AuditGroupSectionItem;
 
 export type AuditSectionPayload = {
   section: {
@@ -48,7 +78,7 @@ export type AuditSectionPayload = {
     title: string;
     status: AuditSectionStatus;
   };
-  items: AuditItemWithResponse[];
+  items: AuditSectionItem[];
   actionItemIds: string[];
 };
 

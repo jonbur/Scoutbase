@@ -20,6 +20,7 @@ export type QuestionSavePayload = {
 type QuestionCardProps = {
   item: AuditItemWithResponse;
   saving: boolean;
+  variant?: "default" | "sub";
   onSave: (itemId: string, payload: QuestionSavePayload) => Promise<void>;
   onRaiseAction: (item: AuditItemWithResponse) => void;
   hasAction: boolean;
@@ -75,6 +76,7 @@ function canSave(item: AuditItemWithResponse, payload: QuestionSavePayload): str
 export function QuestionCard({
   item,
   saving,
+  variant = "default",
   onSave,
   onRaiseAction,
   hasAction,
@@ -154,9 +156,25 @@ export function QuestionCard({
     await persist({ response, needsAction, notes });
   }
 
+  const isSubQuestion = variant === "sub";
+
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="text-base font-medium text-slate-900">{item.question}</h3>
+    <article
+      className={
+        isSubQuestion
+          ? "rounded-lg border border-slate-200 bg-slate-50/70 p-4"
+          : "rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+      }
+    >
+      <h3
+        className={
+          isSubQuestion
+            ? "text-sm font-medium text-slate-900"
+            : "text-base font-medium text-slate-900"
+        }
+      >
+        {item.question}
+      </h3>
       {item.guidance ? (
         <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
           {item.guidance}

@@ -1,6 +1,10 @@
 import type { BuildingAgeBand, FloodRiskZone } from "@prisma/client";
-import type { AuditTemplateItem } from "@/types/audit-template";
-import { isTextAnswerItem } from "@/types/audit-template";
+import type {
+  AnswerableAuditItem,
+  AuditSubQuestion,
+  AuditTemplateItem,
+} from "@/types/audit-template";
+import { isGroupItem, isTextAnswerItem } from "@/types/audit-template";
 
 export type ProfileForSections = {
   buildingAgeBand: BuildingAgeBand;
@@ -44,6 +48,16 @@ export function matchesProfileFlag(
   }
 }
 
+export function isSubQuestionApplicable(
+  subQuestion: AuditSubQuestion,
+  profile: ProfileForSections,
+): boolean {
+  if (!subQuestion.profileFlag) {
+    return true;
+  }
+  return matchesProfileFlag(subQuestion.profileFlag, profile);
+}
+
 export function isAuditItemApplicable(
   item: AuditTemplateItem,
   profile: ProfileForSections,
@@ -54,15 +68,69 @@ export function isAuditItemApplicable(
   return matchesProfileFlag(item.profileFlag, profile);
 }
 
+export function filterApplicableSubQuestions(
+  subQuestions: AuditSubQuestion[],
+  profile: ProfileForSections,
+): AuditSubQuestion[] {
+  return subQuestions.filter((subQuestion) =>
+    isSubQuestionApplicable(subQuestion, profile),
+  );
+}
+
 export function filterApplicableItems(
   items: AuditTemplateItem[],
   profile: ProfileForSections,
 ): AuditTemplateItem[] {
-  return items.filter((item) => isAuditItemApplicable(item, profile));
+  return items
+    .filter((item) => isAuditItemApplicable(item, profile))
+    .map((item) => {
+      if (!isGroupItem(item)) {
+        return item;
+      }
+
+      const subQuestions = filterApplicableSubQuestions(
+        item.subQuestions,
+        profile,
+      );
+
+      if (subQuestions.length === 0) {
+        return null;
+      }
+
+      return {
+        ...item,
+        subQuestions,
+      };
+    })
+    .filter((item): item is AuditTemplateItem => item !== null);
+}
+
+export function getAnswerableItems(
+  items: AuditTemplateItem[],
+): AnswerableAuditItem[] {
+  const answerable: AnswerableAuditItem[] = [];
+
+  for (const item of items) {
+    if (isGroupItem(item)) {
+      answerable.push(...item.subQuestions);
+      continue;
+    }
+
+    answerable.push(item);
+  }
+
+  return answerable;
+}
+
+export function findAnswerableItem(
+  items: AuditTemplateItem[],
+  itemId: string,
+): AnswerableAuditItem | undefined {
+  return getAnswerableItems(items).find((item) => item.id === itemId);
 }
 
 export function isTextResponseComplete(
-  item: AuditTemplateItem,
+  item: AnswerableAuditItem,
   notes: string | null | undefined,
 ): boolean {
   return isTextAnswerItem(item) && Boolean(notes?.trim());

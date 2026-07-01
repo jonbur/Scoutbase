@@ -5,16 +5,22 @@
  * Use this as the single source of truth for the AuditTemplate.sections JSON.
  * Run as a Prisma seed: `npx prisma db seed`
  *
+ * Item shapes:
+ *   Atomic item  — { id, question, guidance?, responseType, requiresDocument, documentType?, profileFlag? }
+ *   Group item   — { id, label, guidance?, responseType: "GROUP", requiresDocument: false, profileFlag?,
+ *                    subQuestions: [{ id, question, responseType, requiresDocument, documentType? }] }
+ *
  * ResponseType values:
- *   YES_NO_NA_ACTION  — standard yes/no/not applicable/action needed (most questions)
- *   OPEN_TEXT         — free-text only (descriptive "how" questions with no binary answer)
- *   DATE_UPLOAD       — prompts for a date + document upload (certificates, reports)
+ *   YES_NO_NA_ACTION  — yes / no / not-applicable / action-needed
+ *   OPEN_TEXT         — free-text answer
+ *   DATE_UPLOAD       — date + document upload (for certificates / reports)
+ *   GROUP             — parent container; render sub-questions individually
  *
- * profileFlag: if set, this item is only shown when the premises profile has that flag = true.
- *   Possible flags: hasGas, hasSleeping, hasCateringKitchen, hasGrounds, hasVehicles,
- *                   hasPlantMachinery, hasThirdPartyUsers, hasPaidStaff, floodRisk (medium/high)
+ * profileFlag: item shown only when premises profile has that flag = true.
+ *   Flags: hasGas, hasSleeping, hasCateringKitchen, hasGrounds, hasVehicles,
+ *          hasPlantMachinery, hasThirdPartyUsers, floodRisk
  *
- * requiresDocument: true = prompts user to upload a certificate/report and enter expiry date.
+ * requiresDocument: true → prompt user to upload a file and enter an expiry date.
  */
 
 export const AUDIT_TEMPLATE_V2025_09 = {
@@ -32,17 +38,57 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s1-q1",
-          question: "Is there a management committee appointed for the premises? How often do they report to the relevant trustee board? How are the trustees aware of their responsibilities for the management of the premises?",
-          guidance: "Consider responsibilities or consequences for both Actions and In-action.",
-          responseType: "YES_NO_NA_ACTION",
+          label: "Management committee and trustee responsibilities",
+          guidance: "Consider responsibilities or consequences for both action and inaction.",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s1-q1a",
+              question: "Is there a management committee appointed for the premises?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s1-q1b",
+              question: "How often does the committee report to the relevant trustee board?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s1-q1c",
+              question: "How are the trustees made aware of their responsibilities for the management of the premises?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s1-q2",
-          question: "Are the current premises risk assessments suitable and sufficient? How are these shared with team members and users? Are they reviewed regularly (at least annually)?",
+          label: "Risk assessments — suitability, sharing and review",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s1-q2a",
+              question: "Are the current premises risk assessments suitable and sufficient?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s1-q2b",
+              question: "How are risk assessments shared with team members and users?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s1-q2c",
+              question: "Are risk assessments reviewed regularly (at least annually)?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s1-q3",
@@ -54,7 +100,7 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         {
           id: "s1-q4",
           question: "How and where are records for maintenance or compliance checks stored?",
-          guidance: "Make sure these are accessible for future reference and changes in trustees.",
+          guidance: "Make sure these are accessible for future reference and for changes in trustees.",
           responseType: "OPEN_TEXT",
           requiresDocument: false,
         },
@@ -67,21 +113,49 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         },
         {
           id: "s1-q6",
-          question: "What assessment has been made of the site for those with additional needs? What reasonable adjustments have been put in place to assist needs?",
+          label: "Accessibility assessment and adjustments",
           guidance: null,
-          responseType: "OPEN_TEXT",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s1-q6a",
+              question: "What assessment has been made of the site for those with additional needs?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s1-q6b",
+              question: "What reasonable adjustments have been put in place to assist those needs?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s1-q7",
-          question: "Is there a notice board or visible signage on the premises for both visitors and staff/volunteers to see? It may include: Yellow Card (safeguarding procedures), Alcohol & Drug guidance, Gas Safety guidance, Carbon Monoxide poster, Fire Evacuation Procedures, Good Hygiene, Food Hygiene, and other safety information. Are these checked they are current?",
-          guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          label: "Notice board / safety signage",
+          guidance: "Should include: Yellow Card, Alcohol & Drug guidance, Gas Safety, Carbon Monoxide poster, Fire Evacuation Procedures, Good Hygiene, Food Hygiene, and other safety information.",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s1-q7a",
+              question: "Is there a notice board or visible signage on the premises for both visitors and staff/volunteers to see?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s1-q7b",
+              question: "Are the notices regularly checked to ensure they are current?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s1-q8",
-          question: "What guidance and controls are in place for Lone working for volunteers or visitors?",
+          question: "What guidance and controls are in place for lone working for volunteers or visitors?",
           guidance: null,
           responseType: "OPEN_TEXT",
           requiresDocument: false,
@@ -104,14 +178,14 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         },
         {
           id: "s2-q2",
-          question: "How are the trustees monitoring that processes are being followed, adequate records are being kept and reviewing incidents?",
+          question: "How are trustees monitoring that processes are being followed, adequate records are being kept, and incidents are being reviewed?",
           guidance: "See learning review guidance on the Scout website.",
           responseType: "OPEN_TEXT",
           requiresDocument: false,
         },
         {
           id: "s2-q3",
-          question: "Do volunteers understand when incidents need to be reported and where to report?",
+          question: "Do volunteers understand when incidents need to be reported and where to report them?",
           guidance: null,
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
@@ -127,29 +201,89 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s3-q1",
-          question: "Is a Fire Risk Assessment in place and completed by a competent person? When was it last reviewed? Who carried it out?",
+          label: "Fire Risk Assessment",
           guidance: "Outstanding actions identified in the Fire RA should be recorded as actions.",
-          responseType: "DATE_UPLOAD",
-          requiresDocument: true,
-          documentType: "FIRE_RA",
+          responseType: "GROUP",
+          requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s3-q1a",
+              question: "Is a Fire Risk Assessment in place and completed by a competent person?",
+              responseType: "DATE_UPLOAD",
+              requiresDocument: true,
+              documentType: "FIRE_RA",
+            },
+            {
+              id: "s3-q1b",
+              question: "When was the Fire Risk Assessment last reviewed?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s3-q1c",
+              question: "Who carried out the most recent Fire Risk Assessment review?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s3-q2",
-          question: "Has the Fire Risk Assessment been shared with the Trustees? Is it sufficient?",
+          label: "FRA shared with trustees and sufficiency",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s3-q2a",
+              question: "Has the Fire Risk Assessment been shared with the Trustees?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s3-q2b",
+              question: "Is the Fire Risk Assessment considered sufficient?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s3-q3",
-          question: "Are fire alarms installed? What type? Are smoke/heat detectors present? How do you raise the alarm? Are call points present? What is the testing and recording regime for these?",
+          label: "Fire alarm system",
           guidance: "Best practice is to test alarms weekly.",
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s3-q3a",
+              question: "Are fire alarms installed, and what type are they?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s3-q3b",
+              question: "Are smoke and/or heat detectors present?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s3-q3c",
+              question: "Are manual call points (break-glass) present?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s3-q3d",
+              question: "What is the testing and recording regime for the fire alarm system?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s3-q4",
-          question: "Is there sleeping accommodation on site? Is the fire alarm system suitable for sleeping in the building?",
+          question: "Is the fire alarm system suitable for use when people are sleeping in the building (e.g. an automated L2 system)?",
           guidance: "An automated alarm system (L2) should be in place where sleeping accommodation is provided.",
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
@@ -157,7 +291,7 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         },
         {
           id: "s3-q5",
-          question: "Are there any additional measures put in place for sleepovers?",
+          question: "Are there any additional fire safety measures put in place specifically for sleepovers?",
           guidance: "Where sleeping is not the building's primary purpose, additional temporary measures should be considered.",
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
@@ -165,79 +299,167 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         },
         {
           id: "s3-q6",
-          question: "Are smoke detectors and Carbon monoxide monitors in good working order, covering hazardous zones, and a testing regime in place? What is the testing regime for these?",
+          label: "Smoke detectors and CO monitors",
           guidance: "Best practice is to test alarms weekly.",
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s3-q6a",
+              question: "Are smoke detectors and carbon monoxide monitors in good working order and covering all hazardous zones?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s3-q6b",
+              question: "What is the testing regime for smoke detectors and CO monitors?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s3-q7",
-          question: "Are the fire extinguishers in good working order and a servicing regime in place? Are they appropriately fixed and have correct signage?",
-          guidance: "A regular walk around and visual check by a team member as well as servicing is a good idea.",
-          responseType: "DATE_UPLOAD",
-          requiresDocument: true,
-          documentType: "FIRE_EXTINGUISHER",
+          label: "Fire extinguishers",
+          guidance: "A regular visual check by a team member as well as annual servicing is good practice.",
+          responseType: "GROUP",
+          requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s3-q7a",
+              question: "Are fire extinguishers in good working order with a current service record?",
+              responseType: "DATE_UPLOAD",
+              requiresDocument: true,
+              documentType: "FIRE_EXTINGUISHER",
+            },
+            {
+              id: "s3-q7b",
+              question: "Are extinguishers appropriately fixed in position with correct signage?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s3-q8",
-          question: "Is there safe access and egress? (getting out in a hurry)",
+          question: "Is there safe access and egress from the building (able to get out quickly in an emergency)?",
           guidance: null,
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
         },
         {
           id: "s3-q9",
-          question: "Is the Emergency lighting suitable and sufficient? Does it light up all evacuation routes and emergency exits?",
+          label: "Emergency lighting — suitability",
           guidance: "Any remedial actions identified in last inspection should be recorded.",
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s3-q9a",
+              question: "Is the emergency lighting suitable and sufficient?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s3-q9b",
+              question: "Does it illuminate all evacuation routes and emergency exits?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s3-q10",
-          question: "Is safety lighting working? Daily — visual indication light is illuminated; Monthly — 1 minute test carried out; Annually — 1 minute test carried out and checking visibility of lighting, signage and fire exit route. Have any remedial actions been completed by a competent person?",
+          label: "Emergency lighting — testing regime",
           guidance: null,
-          responseType: "DATE_UPLOAD",
-          requiresDocument: true,
-          documentType: "EMERGENCY_LIGHTING",
+          responseType: "GROUP",
+          requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s3-q10a",
+              question: "Daily — is the visual indicator light checked to confirm the system is healthy?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s3-q10b",
+              question: "Monthly — is a 1-minute function test carried out and recorded?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s3-q10c",
+              question: "Annually — is a full test carried out, checking visibility of lighting, signage and fire exit routes, by a competent person?",
+              responseType: "DATE_UPLOAD",
+              requiresDocument: true,
+              documentType: "EMERGENCY_LIGHTING",
+            },
+            {
+              id: "s3-q10d",
+              question: "Have any remedial actions identified through testing been completed?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s3-q11",
-          question: "If there is no automatic safety lighting, how are users guided to emergency routes?",
-          guidance: "Glow in the dark signs? Torches?",
+          question: "If there is no automatic emergency lighting, how are users guided to emergency routes?",
+          guidance: "E.g. glow-in-the-dark signs, torches.",
           responseType: "OPEN_TEXT",
           requiresDocument: false,
         },
         {
           id: "s3-q12",
-          question: "When was the last Evacuation drill carried out?",
-          guidance: "Sections are advised to practice this each term. Note — all unplanned evacuations/alarms should be recorded.",
+          question: "When was the last evacuation drill carried out?",
+          guidance: "Sections are advised to practice this each term. All unplanned evacuations/alarms should also be recorded.",
           responseType: "OPEN_TEXT",
           requiresDocument: false,
         },
         {
           id: "s3-q13",
-          question: "What Personal Emergency Evacuation Plans (PEEPs) need to be in place for those with accessible needs?",
+          question: "What Personal Emergency Evacuation Plans (PEEPs) are in place for those with accessible needs?",
           guidance: "An example PEEP can be found on the Scout website.",
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
         },
         {
           id: "s3-q14",
-          question: "Is there a register of Fire Doors? How often are they inspected on this site? When was the last inspection carried out — and by whom? What remedial actions have been carried out?",
-          guidance: "Fire doors are generally used to protect areas from high risks of fire spread, such as a boiler room door in a corridor used for fire escape.",
-          responseType: "YES_NO_NA_ACTION",
+          label: "Fire doors",
+          guidance: "Fire doors protect areas from high-risk fire spread, e.g. a boiler room door in a fire escape corridor.",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s3-q14a",
+              question: "Is there a register of all fire doors on the premises?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s3-q14b",
+              question: "How often are fire doors inspected, when was the last inspection, and who carried it out?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s3-q14c",
+              question: "What remedial actions have been identified and completed following fire door inspections?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s3-q15",
-          question: "Are door closers used to control the speed/weight of closing?",
+          question: "Are door closers fitted to control the speed and weight of closing?",
           guidance: null,
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
         },
         {
           id: "s3-q16",
-          question: "Are door finger guards used to protect hands from the hinged gap?",
+          question: "Are door finger guards fitted to protect hands from the hinged gap?",
           guidance: "Make teams aware of the risks from trapped fingers.",
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
@@ -253,7 +475,7 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s4-q1",
-          question: "Are there documented procedures for the management of foreseeable emergencies? This could include but is not limited to fire, working at heights, working in confined spaces, loss of services or flooding.",
+          question: "Are there documented procedures for the management of foreseeable emergencies, including fire, working at height, confined spaces, loss of services, and flooding?",
           guidance: null,
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
@@ -269,36 +491,91 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s5-q1",
-          question: "When was your portable appliance testing (PAT) completed? When was your Fixed electrical testing (EICR) completed? Have any remedial works been completed?",
+          label: "PAT and fixed electrical testing",
           guidance: "Any remedial actions identified in last inspection should be recorded.",
-          responseType: "DATE_UPLOAD",
-          requiresDocument: true,
-          documentType: "EICR",
+          responseType: "GROUP",
+          requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s5-q1a",
+              question: "When was portable appliance testing (PAT) last completed?",
+              responseType: "DATE_UPLOAD",
+              requiresDocument: true,
+              documentType: "PAT",
+            },
+            {
+              id: "s5-q1b",
+              question: "When was the Fixed Electrical Installation Condition Report (EICR) last completed?",
+              responseType: "DATE_UPLOAD",
+              requiresDocument: true,
+              documentType: "EICR",
+            },
+            {
+              id: "s5-q1c",
+              question: "Have any remedial works identified from these tests been completed?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s5-q2",
-          question: "Are electrical boards & cupboards secure? Have they been tested as appropriate?",
+          label: "Electrical boards and cupboards",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s5-q2a",
+              question: "Are electrical boards and cupboards secure with access restricted?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s5-q2b",
+              question: "Have electrical boards been included in the EICR inspection?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s5-q3",
-          question: "Are wall sockets flush to the wall, screwed in well and with casing in good condition?",
+          question: "Are wall sockets flush to the wall, screwed in well, and with casing in good condition?",
           guidance: null,
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
         },
         {
           id: "s5-q4",
-          question: "Is general lighting working? Inside? Outside? Is it suitable and sufficient?",
+          label: "General lighting",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s5-q4a",
+              question: "Is general lighting working inside the building?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s5-q4b",
+              question: "Is external and security lighting working?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s5-q4c",
+              question: "Is all lighting suitable and sufficient for its purpose?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s5-q5",
-          question: "Date of annual lightning protection check and certification, where installed.",
+          question: "Where lightning protection is installed, has it had its annual inspection and certification?",
           guidance: null,
           responseType: "DATE_UPLOAD",
           requiresDocument: true,
@@ -316,7 +593,7 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s6-q1",
-          question: "Have all Gas appliances been serviced as required? Provide a list of all appliances with check dates.",
+          question: "Have all gas appliances been serviced as required by a Gas Safe registered contractor? Provide a list of all appliances with check dates.",
           guidance: "Note name of Gas Safe contractor used.",
           responseType: "DATE_UPLOAD",
           requiresDocument: true,
@@ -324,7 +601,7 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         },
         {
           id: "s6-q2",
-          question: "Are there interlocks in place between Cooker, extractors and alarm?",
+          question: "Are interlocks in place between cooker, extractors and alarm?",
           guidance: null,
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
@@ -332,32 +609,74 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         },
         {
           id: "s6-q3",
-          question: "Are Carbon Monoxide monitors / Alarms fitted and checked? If there are fireplaces, have chimneys been swept?",
+          label: "Carbon monoxide monitors and chimneys",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s6-q3a",
+              question: "Are carbon monoxide monitors and alarms fitted and regularly checked?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s6-q3b",
+              question: "If fireplaces are present, have the chimneys been swept recently?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s6-q4",
-          question: "When did extraction units / cooker hoods receive annual independent inspection and cleaning?",
+          question: "When did extraction units and cooker hoods last receive annual independent inspection and cleaning?",
           guidance: "Any remedial actions identified in last inspection should be recorded.",
-          responseType: "OPEN_TEXT",
+          responseType: "DATE_UPLOAD",
           requiresDocument: false,
           profileFlag: "hasCateringKitchen",
         },
         {
           id: "s6-q5",
-          question: "Is Bulk Gas stored/used on this site? When was it checked for compliance?",
+          label: "Bulk gas",
           guidance: "Record who carried out the checks.",
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s6-q5a",
+              question: "Is bulk gas stored or used on this site?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s6-q5b",
+              question: "When was the bulk gas installation last checked for compliance, and by whom?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s6-q6",
-          question: "Is bottled Gas stored on site? How is it stored safely? (e.g. in an exterior gas cage?)",
+          label: "Bottled gas storage",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s6-q6a",
+              question: "Is bottled gas stored on site?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s6-q6b",
+              question: "How is it stored safely (e.g. locked exterior cage, upright and secured)?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
       ],
     },
@@ -370,25 +689,67 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s7-q1",
-          question: "Has an Asbestos Survey been carried out for the site? If so — what date?",
+          label: "Asbestos survey",
           guidance: "How is the survey accessible to the trustees?",
-          responseType: "DATE_UPLOAD",
-          requiresDocument: true,
-          documentType: "ASBESTOS",
+          responseType: "GROUP",
+          requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s7-q1a",
+              question: "Has an asbestos survey been carried out for the site?",
+              responseType: "DATE_UPLOAD",
+              requiresDocument: true,
+              documentType: "ASBESTOS",
+            },
+            {
+              id: "s7-q1b",
+              question: "How is the asbestos survey made accessible to trustees and future maintainers?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s7-q2",
-          question: "What is the date of the Asbestos Management Plan (AMP)? When was it last reviewed?",
+          label: "Asbestos Management Plan",
           guidance: null,
-          responseType: "OPEN_TEXT",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s7-q2a",
+              question: "What is the date of the current Asbestos Management Plan (AMP)?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s7-q2b",
+              question: "When was the AMP last reviewed?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s7-q3",
-          question: "Have regular inspections of the asbestos been carried out? How are they recorded?",
+          label: "Asbestos inspections",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s7-q3a",
+              question: "Have regular inspections of identified asbestos been carried out?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s7-q3b",
+              question: "How are asbestos inspection records kept and stored?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
       ],
     },
@@ -401,18 +762,64 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s8-q1",
-          question: "Is there a Legionella Management Plan in place? When was the last Water Quality Risk Assessment done?",
-          guidance: "Recommended for more complex water systems (typically every 2 years). Any remedial actions identified in last inspection should be recorded. HSE guidance — ACOP L8 + HSG274.",
-          responseType: "DATE_UPLOAD",
-          requiresDocument: true,
-          documentType: "LEGIONELLA",
+          label: "Legionella Management Plan and risk assessment",
+          guidance: "Recommended every 2 years for more complex water systems. HSE guidance — ACOP L8 + HSG274.",
+          responseType: "GROUP",
+          requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s8-q1a",
+              question: "Is there a Legionella Management Plan (LMP) in place?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s8-q1b",
+              question: "When was the last Water Quality Risk Assessment completed?",
+              responseType: "DATE_UPLOAD",
+              requiresDocument: true,
+              documentType: "LEGIONELLA",
+            },
+          ],
         },
         {
           id: "s8-q2",
-          question: "How are checks and works being carried out as per the Legionella Management Plan (LMP)? Has your check included: Weekly — flushing of taps, showers & standpipes; Monthly — temperature checks; Quarterly — clean and descale shower heads; Annual — checks all outlets?",
-          guidance: "There is an Example LMP on the Scout website. Section 6.0 of the LMP will give the full list of possible checks required.",
-          responseType: "YES_NO_NA_ACTION",
+          label: "Legionella checks — routine monitoring",
+          guidance: "An example LMP is available on the Scout website. Section 6.0 gives the full list of checks required.",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s8-q2a",
+              question: "Weekly — are all taps, showers and standpipes flushed as required?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s8-q2b",
+              question: "Monthly — are temperature checks carried out at sentinel outlets?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s8-q2c",
+              question: "Quarterly — are shower heads cleaned and descaled?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s8-q2d",
+              question: "Annually — are all outlets checked?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s8-q2e",
+              question: "How are all Legionella monitoring checks recorded?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
       ],
     },
@@ -425,29 +832,29 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s9-q1",
-          question: "Do other groups or third parties also use the site you operate on?",
+          question: "Do other groups or third parties also use the site?",
           guidance: null,
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
         },
         {
           id: "s9-q2",
-          question: "What hazards are naturally occurring that visitors may need to be readily aware of?",
+          question: "What naturally occurring hazards on the site do visitors need to be made aware of?",
           guidance: null,
           responseType: "OPEN_TEXT",
           requiresDocument: false,
         },
         {
           id: "s9-q3",
-          question: "Are there maintenance tasks being carried out that could affect visitors or others staying into your area of operation?",
+          question: "Are there maintenance tasks being carried out that could affect visitors or others in your area of operation?",
           guidance: null,
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
         },
         {
           id: "s9-q4",
-          question: "What Scout activities are carried out at the premises that may be a hazard to visitors or others not actively involved? (e.g. pioneering structures, climbing equipment, campfires)",
-          guidance: "E.g. pioneering structures are disassembled at the end of the session, climbing equipment is returned to locked storage after session, campfires are doused and checked before leaving the area.",
+          question: "What Scout activities at the premises may present a hazard to visitors or others not actively involved (e.g. pioneering structures, climbing equipment, campfires)?",
+          guidance: "E.g. pioneering structures disassembled after session; climbing equipment returned to locked storage; campfires doused and checked before leaving.",
           responseType: "OPEN_TEXT",
           requiresDocument: false,
         },
@@ -469,7 +876,7 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s10-q1",
-          question: "How is access to the premises controlled? (Pedestrians and Vehicles)",
+          question: "How is access to the premises controlled for both pedestrians and vehicles?",
           guidance: null,
           responseType: "OPEN_TEXT",
           requiresDocument: false,
@@ -483,38 +890,100 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         },
         {
           id: "s10-q3",
-          question: "Is there public access to the site? How is this managed when there is no representative on site?",
+          label: "Public access",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s10-q3a",
+              question: "Is there public access to the site?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s10-q3b",
+              question: "How is public access managed when no representative is on site?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s10-q4",
-          question: "Is CCTV used and how is CCTV managed?",
+          label: "CCTV",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s10-q4a",
+              question: "Is CCTV installed on the premises?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s10-q4b",
+              question: "How is CCTV managed (data retention, access controls, GDPR compliance)?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s10-q5",
-          question: "What condition are the paths and roads in? What regular checks are made? Are they likely to cause hazard or damage to pedestrians or vehicles? Is there adequate lighting for these?",
+          label: "Paths and access routes",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s10-q5a",
+              question: "What condition are the paths and access roads in, and what regular checks are made?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s10-q5b",
+              question: "Do they present any risk of hazard or damage to pedestrians or vehicles?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s10-q5c",
+              question: "Is there adequate lighting for paths and access routes?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s10-q6",
-          question: "Are there any parts of the site that are derelict or hidden away? Consider physical dangers from these, and unseen spaces for inappropriate behaviour (e.g. drugs, alcohol or safeguarding issues).",
-          guidance: "Fencing? Signage? Checks?",
+          question: "Are there any parts of the site that are derelict or hidden away? Consider physical dangers and unseen spaces for inappropriate behaviour (e.g. drugs, alcohol, safeguarding issues).",
+          guidance: "Consider fencing, signage and regular checks for these areas.",
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
         },
         {
           id: "s10-q7",
-          question: "Is there disability access to the premises? How often and how is this checked so it is fit for use?",
+          label: "Disability access",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s10-q7a",
+              question: "Is there disability access to the premises?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s10-q7b",
+              question: "How often is disability access checked to ensure it remains fit for use?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
       ],
     },
@@ -527,31 +996,65 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s11-q1",
-          question: "What chemicals or hazardous substances are in the area?",
+          question: "What chemicals or hazardous substances are present on the premises?",
           guidance: null,
           responseType: "OPEN_TEXT",
           requiresDocument: false,
         },
         {
           id: "s11-q2",
-          question: "How are they stored in an appropriate manner? What secure place are they stored in?",
+          question: "How and where are hazardous substances stored securely and appropriately?",
           guidance: null,
           responseType: "OPEN_TEXT",
           requiresDocument: false,
         },
         {
           id: "s11-q3",
-          question: "Are Material Data Sheets available? When were they last reviewed?",
+          label: "Material Safety Data Sheets",
           guidance: "Domestic products may have the necessary information on the label.",
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s11-q3a",
+              question: "Are Material Safety Data Sheets (SDS) available for all chemicals on site?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s11-q3b",
+              question: "When were the data sheets last reviewed?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s11-q4",
-          question: "Have COSHH Risk Assessments been produced and made available to staff and users? When were these last reviewed and who by?",
+          label: "COSHH Risk Assessments",
           guidance: "Domestic products may have the necessary information on the label.",
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s11-q4a",
+              question: "Have COSHH Risk Assessments been produced for all hazardous substances in use?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s11-q4b",
+              question: "Have these assessments been made available to staff and users?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s11-q4c",
+              question: "When were the COSHH assessments last reviewed, and by whom?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
       ],
     },
@@ -564,7 +1067,7 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s12-q1",
-          question: "Has regular camping and Group type equipment been checked/serviced for safety issues? (e.g. gas or petrol stoves, lamps)",
+          question: "Has camping and Group-type equipment been checked and serviced for safety issues (e.g. gas or petrol stoves, lamps)?",
           guidance: null,
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
@@ -578,31 +1081,79 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         },
         {
           id: "s12-q3",
-          question: "How is the equipment safely stored?",
+          question: "How is equipment safely stored?",
           guidance: null,
           responseType: "OPEN_TEXT",
           requiresDocument: false,
         },
         {
           id: "s12-q4",
-          question: "Is there an inventory of all equipment and tools and who maintains the inventory?",
+          label: "Equipment inventory",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s12-q4a",
+              question: "Is there an inventory of all equipment and tools?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s12-q4b",
+              question: "Who maintains the inventory and how often is it updated?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s12-q5",
-          question: "Has all equipment been regularly serviced and maintained in accordance with manufacturer's recommendations? Do any pieces of equipment require external inspection?",
+          label: "Equipment servicing and external inspection",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s12-q5a",
+              question: "Has all equipment been regularly serviced and maintained in accordance with manufacturer's recommendations?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s12-q5b",
+              question: "Does any equipment require external or statutory inspection, and if so is this up to date?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s12-q6",
-          question: "Do you have pioneering equipment? Is it in safe condition? Are there safe places to use it?",
+          label: "Pioneering equipment",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s12-q6a",
+              question: "Do you have pioneering equipment (ropes, spars, lashings, etc.)?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s12-q6b",
+              question: "Is the pioneering equipment in safe condition?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s12-q6c",
+              question: "Are there suitable and safe areas designated for its use?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
       ],
     },
@@ -610,7 +1161,7 @@ export const AUDIT_TEMPLATE_V2025_09 = {
     {
       id: "s13",
       number: 13,
-      title: "Flood Risk Assessment",
+      title: "Flood Risk",
       scope: "ALL",
       items: [
         {
@@ -622,7 +1173,7 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         },
         {
           id: "s13-q2",
-          question: "If your property has medium or higher risk for flooding, do you have a flood risk management plan in place?",
+          question: "If your property has a medium or higher flood risk, do you have a flood risk management plan in place?",
           guidance: null,
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
@@ -630,7 +1181,7 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         },
         {
           id: "s13-q3",
-          question: "Is your property insurer aware of the flooding risk of your property?",
+          question: "Is your property insurer aware of the flooding risk?",
           guidance: null,
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
@@ -654,7 +1205,7 @@ export const AUDIT_TEMPLATE_V2025_09 = {
             {
               id: "s14-q1",
               question: "Are there paid staff employed or used at the premises?",
-              guidance: "E.g. This could include part time cleaners or activity staff.",
+              guidance: "E.g. part-time cleaners or activity staff.",
               responseType: "YES_NO_NA_ACTION",
               requiresDocument: false,
             },
@@ -667,42 +1218,104 @@ export const AUDIT_TEMPLATE_V2025_09 = {
             },
             {
               id: "s14-q3",
-              question: "Have appropriate vetting and disclosure checks been undertaken on those involved at the premises (staff or volunteers)?",
+              question: "Have appropriate vetting and disclosure checks been undertaken on those involved at the premises?",
               guidance: null,
               responseType: "YES_NO_NA_ACTION",
               requiresDocument: false,
             },
             {
               id: "s14-q4",
-              question: "Are all staff and volunteers involved with the premises appointed, with the role connected to the premises recorded on the National membership system? How is this managed and maintained to keep it up to date?",
+              label: "Membership system records",
               guidance: null,
-              responseType: "YES_NO_NA_ACTION",
+              responseType: "GROUP",
               requiresDocument: false,
+              subQuestions: [
+                {
+                  id: "s14-q4a",
+                  question: "Are all staff and volunteers with premises roles recorded on the national membership system?",
+                  responseType: "YES_NO_NA_ACTION",
+                  requiresDocument: false,
+                },
+                {
+                  id: "s14-q4b",
+                  question: "How is this managed and kept up to date when people join or leave?",
+                  responseType: "OPEN_TEXT",
+                  requiresDocument: false,
+                },
+              ],
             },
             {
               id: "s14-q5",
-              question: "What policies have been put in place for the staff or volunteers? Including: Yellow Card (safeguarding procedures), Code of conduct, Alcohol & Drugs, Use of accommodation areas, Reviews with managers (to share any concerns), Reporting of any issues/concerns (ensuring more than one person is designated), Dress code, Knowing who is on site, Lone working, Health & Safety — including training. Are these policies regularly reviewed and readily available to all?",
-              guidance: null,
-              responseType: "YES_NO_NA_ACTION",
+              label: "Staff and volunteer policies",
+              guidance: "Policies should cover: Yellow Card (safeguarding), Code of conduct, Alcohol & Drugs, Accommodation use, Manager reviews, Concern reporting, Dress code, Site sign-in, Lone working, Health & Safety.",
+              responseType: "GROUP",
               requiresDocument: false,
+              subQuestions: [
+                {
+                  id: "s14-q5a",
+                  question: "Are the required policies in place for staff and volunteers (Yellow Card, Code of Conduct, Alcohol & Drugs, Lone Working, H&S, etc.)?",
+                  responseType: "YES_NO_NA_ACTION",
+                  requiresDocument: false,
+                },
+                {
+                  id: "s14-q5b",
+                  question: "Are these policies regularly reviewed and readily available to all staff and volunteers?",
+                  responseType: "YES_NO_NA_ACTION",
+                  requiresDocument: false,
+                },
+              ],
             },
             {
               id: "s14-q6",
-              question: "What training and competency checks are provided for staff and volunteers? Including: Safeguarding, Safety, First Aid, GDPR, Specific activity requirements, Specific maintenance tasks. How is training recorded and competency monitored? By whom?",
-              guidance: "This may be a useful starting point for training team members, although additional specific training may be required for their role.",
-              responseType: "OPEN_TEXT",
+              label: "Training and competency",
+              guidance: "Training areas: Safeguarding, Safety, First Aid, GDPR, activity-specific, maintenance-specific.",
+              responseType: "GROUP",
               requiresDocument: false,
+              subQuestions: [
+                {
+                  id: "s14-q6a",
+                  question: "What training is provided for staff and volunteers (Safeguarding, Safety, First Aid, GDPR, activity-specific, maintenance-specific)?",
+                  responseType: "OPEN_TEXT",
+                  requiresDocument: false,
+                },
+                {
+                  id: "s14-q6b",
+                  question: "How is training recorded?",
+                  responseType: "OPEN_TEXT",
+                  requiresDocument: false,
+                },
+                {
+                  id: "s14-q6c",
+                  question: "How is ongoing competency monitored, and by whom?",
+                  responseType: "OPEN_TEXT",
+                  requiresDocument: false,
+                },
+              ],
             },
             {
               id: "s14-q7",
-              question: "What induction of safety procedures are in place for staff on taking up a new role? Are these suitable and sufficient?",
+              label: "Safety induction",
               guidance: null,
-              responseType: "YES_NO_NA_ACTION",
+              responseType: "GROUP",
               requiresDocument: false,
+              subQuestions: [
+                {
+                  id: "s14-q7a",
+                  question: "What safety induction is provided when staff or volunteers take up a new role?",
+                  responseType: "OPEN_TEXT",
+                  requiresDocument: false,
+                },
+                {
+                  id: "s14-q7b",
+                  question: "Is the induction suitable and sufficient?",
+                  responseType: "YES_NO_NA_ACTION",
+                  requiresDocument: false,
+                },
+              ],
             },
             {
               id: "s14-q8",
-              question: "Are staff/volunteers easily recognisable to visitors and each other?",
+              question: "Are staff and volunteers easily recognisable to visitors and each other?",
               guidance: null,
               responseType: "YES_NO_NA_ACTION",
               requiresDocument: false,
@@ -710,7 +1323,7 @@ export const AUDIT_TEMPLATE_V2025_09 = {
             {
               id: "s14-q9",
               question: "How are language barriers managed for vital communications?",
-              guidance: "Pictograms can be used to help this.",
+              guidance: "Pictograms can be used to help.",
               responseType: "OPEN_TEXT",
               requiresDocument: false,
             },
@@ -722,15 +1335,29 @@ export const AUDIT_TEMPLATE_V2025_09 = {
           items: [
             {
               id: "s14-q10",
-              question: "What clear boundaries are in place for the staff areas (considerations for their welfare and safeguarding protection)? How is separate accommodation provided for those under 18 attending to support the premises?",
-              guidance: "Remember our Safeguarding Code of Practice: Do have separate sleeping accommodation for young people, adults and Young Leaders working with a younger section.",
-              responseType: "YES_NO_NA_ACTION",
+              label: "Staff area boundaries and under-18 accommodation",
+              guidance: "Safeguarding Code of Practice: provide separate sleeping accommodation for young people, adults and Young Leaders working with a younger section.",
+              responseType: "GROUP",
               requiresDocument: false,
               profileFlag: "hasSleeping",
+              subQuestions: [
+                {
+                  id: "s14-q10a",
+                  question: "What clear boundaries are in place for staff-only areas, for both welfare and safeguarding?",
+                  responseType: "OPEN_TEXT",
+                  requiresDocument: false,
+                },
+                {
+                  id: "s14-q10b",
+                  question: "How is separate sleeping accommodation provided for those under 18 who are supporting the premises?",
+                  responseType: "OPEN_TEXT",
+                  requiresDocument: false,
+                },
+              ],
             },
             {
               id: "s14-q11",
-              question: "How are checks on upkeep, welfare and the appropriate behaviour/activity of staff in staff accommodation monitored and managed?",
+              question: "How are checks on upkeep, welfare and appropriate behaviour of staff in accommodation monitored and managed?",
               guidance: null,
               responseType: "OPEN_TEXT",
               requiresDocument: false,
@@ -739,7 +1366,7 @@ export const AUDIT_TEMPLATE_V2025_09 = {
           ],
         },
       ],
-      items: [], // items stored in subsections
+      items: [],
     },
 
     {
@@ -764,39 +1391,93 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         },
         {
           id: "s15-q3",
-          question: "What process is in place for visitors to check out? How do you know they have left the site?",
+          label: "Visitor checkout",
           guidance: null,
-          responseType: "OPEN_TEXT",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s15-q3a",
+              question: "What process is in place for visiting groups to check out?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s15-q3b",
+              question: "How do you confirm that all visitors have left the site?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s15-q4",
-          question: "Is there a record and agreement in place with users of the premises?",
+          question: "Is there a written record and agreement in place with users of the premises?",
           guidance: null,
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
         },
         {
           id: "s15-q5",
-          question: "How do staff/volunteers observe/report concerns about the following practices by users: alcohol & drugs behaviour, young people's welfare and safeguarding, safe activities & camping, supervision of young people during 'free time', photos — inappropriate taking?",
+          question: "How do staff and volunteers observe and report concerns about visitor behaviour — including alcohol and drugs, young people's welfare, safeguarding, safe activities, supervision during free time, and inappropriate photography?",
           guidance: null,
           responseType: "OPEN_TEXT",
           requiresDocument: false,
         },
         {
           id: "s15-q6",
-          question: "How are non-Scout users of the premises made aware of the procedures regarding reporting of incidents or safeguarding concerns? What safeguarding arrangements do they have?",
+          label: "Non-Scout user safeguarding",
           guidance: null,
-          responseType: "OPEN_TEXT",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s15-q6a",
+              question: "How are non-Scout users made aware of the procedures for reporting incidents and safeguarding concerns?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s15-q6b",
+              question: "What safeguarding arrangements do non-Scout users have in place themselves?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s15-q7",
-          question: "Bunk Beds — What guidance is in place to advise users of the risks? Is the ladder fixed to the bed frame? Is there a 760mm gap from the top bunk to the ceiling? Are there any gaps smaller than 60mm or larger than 75mm?",
+          label: "Bunk beds",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
           profileFlag: "hasSleeping",
+          subQuestions: [
+            {
+              id: "s15-q7a",
+              question: "Is guidance provided to users on bunk bed safety risks?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s15-q7b",
+              question: "Is the ladder fixed securely to the bed frame?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s15-q7c",
+              question: "Is there at least 760mm clearance between the top bunk mattress and the ceiling?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s15-q7d",
+              question: "Are all bunk bed gaps between 60mm and 75mm (no entrapment risk from gaps outside this range)?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
       ],
     },
@@ -809,21 +1490,55 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s16-q1",
-          question: "Is there adequate first aid cover? What first aid equipment is there? What process is in place to regularly check it?",
+          label: "First aid cover and equipment",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s16-q1a",
+              question: "Is there adequate trained first aid cover during activities?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s16-q1b",
+              question: "What first aid equipment is available on site?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s16-q1c",
+              question: "What process is in place to regularly check and restock first aid equipment?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s16-q2",
-          question: "Is there a Defibrillator (AED), Trauma kit, Bleed kit, and/or Anaphylaxis kit on site? What process is in place to regularly check it?",
+          label: "AED, trauma, bleed and anaphylaxis kits",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s16-q2a",
+              question: "Is there a Defibrillator (AED), trauma kit, bleed kit and/or anaphylaxis kit on site?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s16-q2b",
+              question: "What process is in place to regularly check and maintain these items?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s16-q3",
-          question: "How do you dispose of sharp objects and large amounts of medical waste?",
+          question: "How are sharp objects and large amounts of medical waste disposed of?",
           guidance: null,
           responseType: "OPEN_TEXT",
           requiresDocument: false,
@@ -839,21 +1554,47 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s17-q1",
-          question: "Contractors — how are contractor competencies assessed? Are inductions being carried out sufficiently and recorded? Has the Yellow card been shared? What documentation is in place for this?",
-          guidance: "References, Qualifications, Professional memberships etc.",
-          responseType: "OPEN_TEXT",
+          label: "Contractor competency, induction and documentation",
+          guidance: "Competency evidence: references, qualifications, professional memberships.",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s17-q1a",
+              question: "How are contractor competencies assessed before work begins?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s17-q1b",
+              question: "Are contractor inductions carried out and recorded?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s17-q1c",
+              question: "Has the Yellow Card (safeguarding procedures) been shared with contractors?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s17-q1d",
+              question: "What documentation is kept to evidence competency checks and inductions?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s17-q2",
-          question: "How are contractors being effectively and safely managed whilst on site?",
+          question: "How are contractors effectively and safely managed whilst on site?",
           guidance: null,
           responseType: "OPEN_TEXT",
           requiresDocument: false,
         },
         {
           id: "s17-q3",
-          question: "Are Risk Assessments and Method Statements (RAMS) from Contractors suitable and sufficient?",
+          question: "Are Risk Assessments and Method Statements (RAMS) from contractors suitable and sufficient?",
           guidance: null,
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
@@ -876,17 +1617,57 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s18-q1",
-          question: "What areas present a risk of falls from height? (activity, roof, storage, etc.) How is this managed? Are there any below ground and confined spaces?",
+          label: "Falls from height and confined spaces",
           guidance: null,
-          responseType: "OPEN_TEXT",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s18-q1a",
+              question: "What areas on the site present a risk of falls from height (activities, roof, storage, etc.)?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s18-q1b",
+              question: "How are these fall-from-height risks managed?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s18-q1c",
+              question: "Are there any below-ground areas or confined spaces, and how are these managed?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s18-q2",
-          question: "Are there any scaffolding structures on site — long or short term? What inspection regime exists to keep them safe? What protection is in place to stop anyone from climbing on them?",
-          guidance: "Regular inspections?",
-          responseType: "YES_NO_NA_ACTION",
+          label: "Scaffolding",
+          guidance: null,
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s18-q2a",
+              question: "Are there any scaffolding structures on site (permanent or temporary)?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s18-q2b",
+              question: "What inspection regime is in place for scaffolding?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s18-q2c",
+              question: "What measures are in place to prevent unauthorised access or climbing on scaffolding?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
       ],
     },
@@ -900,20 +1681,20 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         {
           id: "s19-q1",
           question: "Have staff and volunteers received appropriate manual handling training for their tasks?",
-          guidance: "It is recommended those involved in regular handling activity should have relevant (refresher) training from time to time.",
+          guidance: "Those involved in regular handling activity should receive refresher training from time to time.",
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
         },
         {
           id: "s19-q2",
-          question: "How have the local risks from handling (particularly in storage areas) been identified and what suitable controls put in place?",
+          question: "How have local handling risks (particularly in storage areas) been identified and what controls put in place?",
           guidance: null,
           responseType: "OPEN_TEXT",
           requiresDocument: false,
         },
         {
           id: "s19-q3",
-          question: "Is there suitable and sufficient equipment to help with safe handling?",
+          question: "Is there suitable and sufficient equipment to assist with safe handling?",
           guidance: null,
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
@@ -930,14 +1711,14 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s20-q1",
-          question: "What systems are in place for food control? Are these controls in line with relevant regulations for the activities being undertaken?",
+          question: "What food safety control systems are in place, and are these in line with relevant regulations?",
           guidance: null,
           responseType: "OPEN_TEXT",
           requiresDocument: false,
         },
         {
           id: "s20-q2",
-          question: "What training has been received by staff in relation to food safety and hygiene?",
+          question: "What food safety and hygiene training has been received by staff?",
           guidance: null,
           responseType: "OPEN_TEXT",
           requiresDocument: false,
@@ -953,10 +1734,30 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s21-q1",
-          question: "Is the area tidy and free of waste? Is there a documented process for the disposal of waste? If there is a concern over vermin, is an appropriate pest control system in place with appropriate records?",
+          label: "Waste management and pest control",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s21-q1a",
+              question: "Is the site tidy and free from waste and rubbish?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s21-q1b",
+              question: "Is there a documented process for waste disposal?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s21-q1c",
+              question: "Is an appropriate pest control system in place with records?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s21-q2",
@@ -967,10 +1768,30 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         },
         {
           id: "s21-q3",
-          question: "Are there any loft hatches? What is the process for using these? How are they secured when not in use to prevent unplanned access?",
+          label: "Loft hatches",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s21-q3a",
+              question: "Are there any loft hatches on the premises?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s21-q3b",
+              question: "What is the process for safe use of loft hatches?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s21-q3c",
+              question: "How are loft hatches secured when not in use to prevent unplanned access?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s21-q4",
@@ -981,24 +1802,52 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         },
         {
           id: "s21-q5",
-          question: "Have Workstation Assessments been carried out for regular computer users? (where required, including display screen equipment)",
-          guidance: "Have remedial actions from these been taken?",
-          responseType: "YES_NO_NA_ACTION",
+          label: "Workstation assessments (DSE)",
+          guidance: null,
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s21-q5a",
+              question: "Have Workstation Assessments been carried out for regular computer/display screen users?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s21-q5b",
+              question: "Have any remedial actions from these assessments been completed?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s21-q6",
-          question: "What processes are in place for Lone Working or Remote Working?",
+          question: "What processes are in place for lone working or remote working?",
           guidance: null,
           responseType: "OPEN_TEXT",
           requiresDocument: false,
         },
         {
           id: "s21-q7",
-          question: "Are plans available for the site? Do these show underground and overhead services?",
+          label: "Site plans",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s21-q7a",
+              question: "Are site plans available for the premises?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s21-q7b",
+              question: "Do the site plans show underground and overhead services (gas, electric, water, drainage)?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
       ],
     },
@@ -1012,31 +1861,105 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s22-q1",
-          question: "Is racking and storage safe for use? Is it inspected and recorded?",
+          label: "Racking and storage",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s22-q1a",
+              question: "Is racking and storage safe for use?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s22-q1b",
+              question: "Is racking and storage regularly inspected and the results recorded?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s22-q2",
-          question: "Has all equipment been regularly serviced and maintained in accordance with manufacturer's recommendations? Do any pieces of equipment require external inspection? If so is the relevant inspection process in place and up to date (for example LOLER and PUWER)?",
+          label: "Plant and machinery servicing and statutory inspection",
           guidance: "Use stickers to show service dates.",
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s22-q2a",
+              question: "Has all plant and machinery been regularly serviced per manufacturer's recommendations?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s22-q2b",
+              question: "Does any equipment require statutory external inspection (e.g. under LOLER or PUWER)?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s22-q2c",
+              question: "If so, are these inspection processes in place and up to date?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s22-q3",
-          question: "Are all Ladders listed on a Ladder Register? How are Ladder inspections managed?",
-          guidance: "Mark the ladders with a unique ID to correspond to the register.",
-          responseType: "YES_NO_NA_ACTION",
+          label: "Ladder register and inspections",
+          guidance: "Mark ladders with a unique ID to correspond to the register.",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s22-q3a",
+              question: "Are all ladders listed on a Ladder Register with unique IDs?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s22-q3b",
+              question: "How are pre-use checks and periodic ladder inspections managed and recorded?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s22-q4",
-          question: "Do you have an activities or playground area? What checking and maintenance plan is in place? Does access to the equipment need to be controlled? How is supervision of users managed?",
+          label: "Activities area and playground",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s22-q4a",
+              question: "Do you have an activities area or playground?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s22-q4b",
+              question: "What checking and maintenance plan is in place for activities or play equipment?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s22-q4c",
+              question: "Is access to the equipment controlled when not in supervised use?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s22-q4d",
+              question: "How is supervision of users of the activities area managed?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
       ],
     },
@@ -1050,11 +1973,25 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s23-q1",
-          question: "Is there documentary proof that site vehicles or minibuses have been properly maintained? Have all trailers been regularly serviced and inspected?",
-          guidance: "What driving licence checks have been carried out on those driving on behalf of the site?",
-          responseType: "DATE_UPLOAD",
-          requiresDocument: true,
-          documentType: "OTHER",
+          label: "Vehicle and trailer maintenance",
+          guidance: "Driving licence checks should be carried out on those driving on behalf of the site.",
+          responseType: "GROUP",
+          requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s23-q1a",
+              question: "Is there documentary proof that site vehicles and minibuses have been properly maintained?",
+              responseType: "DATE_UPLOAD",
+              requiresDocument: true,
+              documentType: "OTHER",
+            },
+            {
+              id: "s23-q1b",
+              question: "Have all trailers been regularly serviced and inspected?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s23-q2",
@@ -1088,14 +2025,40 @@ export const AUDIT_TEMPLATE_V2025_09 = {
         },
         {
           id: "s24-q2",
-          question: "Is it in usable condition? Is it stored in an appropriate manner? Is it suitable and sufficient? Does the PPE fit the user properly?",
+          label: "PPE condition, storage and fit",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s24-q2a",
+              question: "Is all PPE in usable condition?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s24-q2b",
+              question: "Is PPE stored appropriately when not in use?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s24-q2c",
+              question: "Is the PPE suitable and sufficient for the identified risks?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s24-q2d",
+              question: "Does the PPE fit its users properly?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s24-q3",
-          question: "Have users been properly trained how to use it?",
+          question: "Have users been properly trained in how to use their PPE?",
           guidance: null,
           responseType: "YES_NO_NA_ACTION",
           requiresDocument: false,
@@ -1112,24 +2075,84 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s25-q1",
-          question: "When was the last survey of trees carried out on site? Where are details of the tree surveys stored? Are the trees in a managed state so as not to encroach on or cause risk to roads, paths and buildings? Is there a documented procedure for all grounds management including use of machinery, pesticides and herbicides?",
+          label: "Tree surveys and grounds management procedure",
           guidance: "Any remedial actions identified in last inspection should be recorded.",
-          responseType: "DATE_UPLOAD",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s25-q1a",
+              question: "When was the last tree survey carried out on site?",
+              responseType: "DATE_UPLOAD",
+              requiresDocument: false,
+            },
+            {
+              id: "s25-q1b",
+              question: "Where are tree survey records stored and how are they accessible to trustees?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s25-q1c",
+              question: "Are trees maintained so they pose no risk of encroachment on or damage to roads, paths or buildings?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s25-q1d",
+              question: "Is there a documented grounds management procedure covering the use of machinery, pesticides and herbicides?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s25-q2",
-          question: "Is there any Invasive Non-Native Species (INNS) present on site? Is there a management plan available for the INNS on site?",
+          label: "Invasive Non-Native Species (INNS)",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s25-q2a",
+              question: "Is there any Invasive Non-Native Species (INNS) present on site?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s25-q2b",
+              question: "If so, is there a management plan in place for the INNS?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+          ],
         },
         {
           id: "s25-q3",
-          question: "Are any areas of the grounds prone to flooding? How is this managed? How are users of the site notified in advance of visiting?",
+          label: "Grounds flooding",
           guidance: null,
-          responseType: "YES_NO_NA_ACTION",
+          responseType: "GROUP",
           requiresDocument: false,
+          subQuestions: [
+            {
+              id: "s25-q3a",
+              question: "Are any areas of the grounds prone to localised flooding?",
+              responseType: "YES_NO_NA_ACTION",
+              requiresDocument: false,
+            },
+            {
+              id: "s25-q3b",
+              question: "How is localised flooding managed?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+            {
+              id: "s25-q3c",
+              question: "How are visiting groups notified about flood-prone areas before their visit?",
+              responseType: "OPEN_TEXT",
+              requiresDocument: false,
+            },
+          ],
         },
       ],
     },
@@ -1142,7 +2165,7 @@ export const AUDIT_TEMPLATE_V2025_09 = {
       items: [
         {
           id: "s26-q1",
-          question: "Are there any other features or practices on site that are not mentioned above that should be included in this audit and subsequent audits?",
+          question: "Are there any other features or practices on site not covered above that should be included in this and future audits?",
           guidance: null,
           responseType: "OPEN_TEXT",
           requiresDocument: false,
@@ -1154,19 +2177,21 @@ export const AUDIT_TEMPLATE_V2025_09 = {
 } as const;
 
 /**
- * Key terms used in the template:
- * PPE     — Personal Protective Equipment
- * RIDDOR  — Reporting of Injuries, Diseases and Dangerous Occurrences Regulations
- * COSHH   — Control of Substances Hazardous to Health
- * LOLER   — Lifting Operations & Lifting Equipment Regulations
- * PUWER   — Provision & Use of Work Equipment Regulations
- * LMP     — Legionella Management Plan
- * AMP     — Asbestos Management Plan
- * FRA     — Fire Risk Assessment
- * PEEP    — Personal Emergency Evacuation Plan
- * EICR    — Electrical Installation Condition Report
- * PAT     — Portable Appliance Testing
- * RAMS    — Risk Assessments & Method Statements
+ * Acronyms used in this template:
  * AED     — Automated External Defibrillator
+ * AMP     — Asbestos Management Plan
+ * COSHH   — Control of Substances Hazardous to Health
+ * DSE     — Display Screen Equipment
+ * EICR    — Electrical Installation Condition Report
+ * FRA     — Fire Risk Assessment
  * INNS    — Invasive Non-Native Species
+ * LMP     — Legionella Management Plan
+ * LOLER   — Lifting Operations & Lifting Equipment Regulations
+ * PAT     — Portable Appliance Testing
+ * PEEP    — Personal Emergency Evacuation Plan
+ * PPE     — Personal Protective Equipment
+ * PUWER   — Provision & Use of Work Equipment Regulations
+ * RAMS    — Risk Assessments & Method Statements
+ * RIDDOR  — Reporting of Injuries, Diseases and Dangerous Occurrences Regulations
+ * SDS     — Safety Data Sheet (formerly MSDS)
  */
