@@ -34,6 +34,7 @@ export type AuditItemWithResponse = {
   response: {
     id: string;
     response: ResponseValue;
+    needsAction: boolean;
     notes: string | null;
   } | null;
 };

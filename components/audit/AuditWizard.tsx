@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Priority, ResponseValue } from "@prisma/client";
+import type { Priority } from "@prisma/client";
+import type { QuestionSavePayload } from "@/components/audit/QuestionCard";
 import { ActionRaiseForm } from "@/components/audit/ActionRaiseForm";
 import { QuestionCard } from "@/components/audit/QuestionCard";
 import { SectionNav } from "@/components/audit/SectionNav";
@@ -81,10 +82,9 @@ export function AuditWizard({
     );
   }
 
-  async function saveResponse(
+  async function saveQuestion(
     itemId: string,
-    response: ResponseValue,
-    notes?: string,
+    payload: QuestionSavePayload,
   ) {
     setSavingItemId(itemId);
     setError(null);
@@ -96,8 +96,9 @@ export function AuditWizard({
         body: JSON.stringify({
           itemId,
           sectionId: activeSectionId,
-          response,
-          notes: notes ?? null,
+          response: payload.response,
+          notes: payload.notes || null,
+          needsAction: payload.needsAction,
         }),
       });
 
@@ -122,6 +123,7 @@ export function AuditWizard({
                   response: {
                     id: result.data.response.id,
                     response: result.data.response.response,
+                    needsAction: result.data.response.needsAction,
                     notes: result.data.response.notes,
                   },
                 }
@@ -130,11 +132,17 @@ export function AuditWizard({
         };
       });
 
+      if (payload.needsAction) {
+        setActionItemIds((current) =>
+          current.includes(itemId) ? current : [...current, itemId],
+        );
+      } else {
+        setActionItemIds((current) => current.filter((id) => id !== itemId));
+      }
+
       await refreshOverview();
     } catch (saveError) {
-      setError(
-        saveError instanceof Error ? saveError.message : "Failed to save response",
-      );
+      throw saveError;
     } finally {
       setSavingItemId(null);
     }
@@ -246,7 +254,18 @@ export function AuditWizard({
                   item={item}
                   saving={savingItemId === item.id}
                   hasAction={actionItemIds.includes(item.id)}
-                  onResponseChange={saveResponse}
+                  onSave={async (itemId, payload) => {
+                    try {
+                      await saveQuestion(itemId, payload);
+                    } catch (saveError) {
+                      setError(
+                        saveError instanceof Error
+                          ? saveError.message
+                          : "Failed to save response",
+                      );
+                      throw saveError;
+                    }
+                  }}
                   onRaiseAction={setActionItem}
                 />
               ))}

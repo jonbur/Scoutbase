@@ -159,6 +159,19 @@ export async function startOrResumeAudit(
   };
 }
 
+function isResponseComplete(response: AuditResponse): boolean {
+  if (response.response === ResponseValue.YES) {
+    return Boolean(response.notes?.trim());
+  }
+  if (
+    response.response === ResponseValue.NO ||
+    response.response === ResponseValue.NA
+  ) {
+    return true;
+  }
+  return response.response === ResponseValue.ACTION_NEEDED;
+}
+
 async function refreshSectionStatus(
   auditId: string,
   sectionId: string,
@@ -187,7 +200,7 @@ async function refreshSectionStatus(
     },
   });
 
-  const answeredCount = responses.length;
+  const answeredCount = responses.filter(isResponseComplete).length;
   let status: AuditSectionStatus;
 
   if (answeredCount === 0) {
@@ -213,7 +226,10 @@ export async function saveAuditResponse(
   itemId: string,
   sectionId: string,
   response: ResponseValue,
-  notes?: string | null,
+  options?: {
+    notes?: string | null;
+    needsAction?: boolean;
+  },
 ): Promise<{
   response: AuditResponse;
   sectionStatus: AuditSectionStatus;
@@ -247,6 +263,17 @@ export async function saveAuditResponse(
     throw new Error("Question not found in this section");
   }
 
+  const needsAction = options?.needsAction ?? false;
+  const notes = options?.notes ?? null;
+
+  if (response === ResponseValue.YES && !notes?.trim()) {
+    throw new Error("Provide details is required when answering Yes");
+  }
+
+  if (needsAction && response !== ResponseValue.YES && response !== ResponseValue.NO) {
+    throw new Error("Needs action can only be set for Yes or No answers");
+  }
+
   const saved = await prisma.auditResponse.upsert({
     where: {
       auditId_itemId: { auditId, itemId },
@@ -255,12 +282,14 @@ export async function saveAuditResponse(
       auditId,
       itemId,
       response,
-      notes: notes ?? null,
+      needsAction,
+      notes: notes?.trim() ? notes.trim() : null,
       respondedBy: userId,
     },
     update: {
       response,
-      notes: notes ?? null,
+      needsAction,
+      notes: notes?.trim() ? notes.trim() : null,
       respondedBy: userId,
       respondedAt: new Date(),
     },
@@ -312,14 +341,29 @@ export async function createAuditAction(
     },
   });
 
+  const existing = await prisma.auditResponse.findUnique({
+    where: {
+      auditId_itemId: { auditId, itemId: input.itemId },
+    },
+  });
+
+  const response =
+    existing?.response === ResponseValue.YES ||
+    existing?.response === ResponseValue.NO
+      ? existing.response
+      : ResponseValue.NO;
+
   await saveAuditResponse(
     auditId,
     organisationId,
     userId,
     input.itemId,
     input.sectionId,
-    ResponseValue.ACTION_NEEDED,
-    input.description ?? undefined,
+    response,
+    {
+      notes: existing?.notes ?? input.description ?? null,
+      needsAction: true,
+    },
   );
 
   return action;
@@ -350,8 +394,12 @@ export function buildAuditSectionPayload(
     (entry) => entry.sectionId === sectionId,
   );
 
-  const actions = audit.responses
-    .filter((response) => response.response === ResponseValue.ACTION_NEEDED)
+  const actionItemIds = audit.responses
+    .filter(
+      (response) =>
+        response.needsAction ||
+        response.response === ResponseValue.ACTION_NEEDED,
+    )
     .map((response) => response.itemId);
 
   return {
@@ -365,7 +413,7 @@ export function buildAuditSectionPayload(
       ...item,
       response: responsesByItemId[item.id] ?? null,
     })),
-    actionItemIds: actions,
+    actionItemIds,
   };
 }
 
@@ -390,8 +438,9 @@ export function buildAuditOverview(audit: AuditWithRelations) {
       );
       const itemCount = applicableItems.length;
       const applicableIds = new Set(applicableItems.map((item) => item.id));
-      const answeredCount = audit.responses.filter((response) =>
-        applicableIds.has(response.itemId),
+      const answeredCount = audit.responses.filter(
+        (response) =>
+          applicableIds.has(response.itemId) && isResponseComplete(response),
       ).length;
 
       return {

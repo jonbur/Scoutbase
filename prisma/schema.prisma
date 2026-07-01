@@ -114,6 +114,7 @@ model AuditResponse {
   audit       Audit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
   itemId      String
   response    ResponseValue
+  needsAction Boolean       @default(false)
   notes       String?
   respondedBy String
   respondedAt DateTime      @default(now())

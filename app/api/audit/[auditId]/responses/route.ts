@@ -5,7 +5,11 @@ import { saveAuditResponse } from "@/lib/audit";
 
 type RouteParams = { params: { auditId: string } };
 
-const VALID_RESPONSES = new Set<string>(Object.values(ResponseValue));
+const VALID_RESPONSES = new Set<string>([
+  ResponseValue.YES,
+  ResponseValue.NO,
+  ResponseValue.NA,
+]);
 
 export async function PUT(request: Request, { params }: RouteParams) {
   try {
@@ -16,6 +20,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
     const sectionId = body?.sectionId as string | undefined;
     const response = body?.response as string | undefined;
     const notes = body?.notes as string | null | undefined;
+    const needsAction = Boolean(body?.needsAction);
 
     if (!itemId || !sectionId || !response) {
       return NextResponse.json(
@@ -38,7 +43,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
       itemId,
       sectionId,
       response as ResponseValue,
-      notes,
+      { notes, needsAction },
     );
 
     return NextResponse.json({
@@ -56,7 +61,9 @@ export async function PUT(request: Request, { params }: RouteParams) {
         ? 401
         : message === "Audit not found" || message === "Question not found in this section"
           ? 404
-          : message === "Cannot edit a completed audit"
+          : message === "Cannot edit a completed audit" ||
+              message.includes("required") ||
+              message.includes("Needs action")
             ? 400
             : 500;
 
