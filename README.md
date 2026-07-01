@@ -11,24 +11,29 @@ Compliance management SaaS for volunteer-run community buildings — initially U
 
 ## Database setup
 
-1. Copy environment variables:
+### Local PostgreSQL (Docker)
 
 ```bash
 cp .env.example .env
-```
-
-2. Set `DATABASE_URL` to your PostgreSQL connection string (Supabase or local).
-
-3. Run migrations:
-
-```bash
 npm install
-npm run db:migrate
+npm run docker:up          # starts postgres:16 on localhost:5432
+npm run db:setup           # migrate + seed
 ```
 
-4. Seed the audit template:
+Default credentials match `docker-compose.yml`: `postgres` / `postgres`, database `vigil`.
+
+Reset the database (drops volume and re-seeds):
 
 ```bash
+npm run docker:reset
+```
+
+### Supabase / remote PostgreSQL
+
+Set `DATABASE_URL` in `.env`, then:
+
+```bash
+npm run db:migrate:deploy
 npm run db:seed
 ```
 
@@ -41,6 +46,10 @@ npm run db:seed
 | `npm run db:migrate:deploy` | Apply migrations (production) |
 | `npm run db:seed` | Seed audit template v2025-09 |
 | `npm run db:studio` | Open Prisma Studio |
+| `npm run db:setup` | Apply migrations and seed |
+| `npm run docker:up` | Start local Postgres container |
+| `npm run docker:down` | Stop Postgres container |
+| `npm run docker:reset` | Reset DB volume, migrate, and seed |
 
 ## Schema
 
