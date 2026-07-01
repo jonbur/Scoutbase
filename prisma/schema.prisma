@@ -109,14 +109,16 @@ model AuditSection {
 }
 
 model AuditResponse {
-  id          String        @id @default(cuid())
-  auditId     String
-  audit       Audit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
-  itemId      String
-  response    ResponseValue
-  notes       String?
-  respondedBy String
-  respondedAt DateTime      @default(now())
+  id           String        @id @default(cuid())
+  auditId      String
+  audit        Audit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  itemId       String
+  response     ResponseValue
+  needsAction  Boolean       @default(false)
+  notes        String?
+  recordedDate DateTime?     @db.Date
+  respondedBy  String
+  respondedAt  DateTime      @default(now())
 
   @@unique([auditId, itemId])
   @@index([auditId])
