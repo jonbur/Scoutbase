@@ -18,6 +18,7 @@ import {
   collectAnswerableItemIds,
   defaultAuditDate,
   getActiveAuditTemplate,
+  getAuditTemplateById,
   getAuditTemplateSections,
   parseTemplateSections,
 } from "@/lib/audit-templates";
@@ -356,8 +357,12 @@ export async function startNewAudit(
   premisesId: string,
   organisationId: string,
   userId: string,
-  auditDate: Date = defaultAuditDate(),
+  options: {
+    auditDate?: Date;
+    templateId?: string;
+  } = {},
 ): Promise<{ audit: AuditWithRelations; created: boolean }> {
+  const auditDate = options.auditDate ?? defaultAuditDate();
   const premises = await getPremisesForOrganisation(premisesId, organisationId);
 
   if (!premises) {
@@ -377,10 +382,14 @@ export async function startNewAudit(
     throw new Error("Finish or continue the draft audit before starting another");
   }
 
-  const template = await getActiveAuditTemplate();
+  const template = options.templateId
+    ? await getAuditTemplateById(options.templateId)
+    : await getActiveAuditTemplate();
 
   if (!template) {
-    throw new Error("No active audit template found");
+    throw new Error(
+      options.templateId ? "Selected audit template not found" : "No active audit template found",
+    );
   }
 
   const templateSections = parseTemplateSections(template.sections);

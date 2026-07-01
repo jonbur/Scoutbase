@@ -27,13 +27,19 @@ export default async function Home() {
                 href={`/premises/${premises.id}/audit`}
                 className="rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-800"
               >
-                Start annual audit
+                Manage audits
               </Link>
               <Link
                 href={`/premises/${premises.id}/actions`}
                 className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 View actions
+              </Link>
+              <Link
+                href="/templates"
+                className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Audit templates
               </Link>
             </>
           ) : null}

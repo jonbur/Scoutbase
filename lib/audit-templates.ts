@@ -1,5 +1,6 @@
 import type { Audit, AuditTemplate, AuditTemplateChangeType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { validateTemplateSections } from "@/lib/audit-template-import";
 import type { AuditTemplateSections } from "@/types/audit-template";
 import {
   formatAuditTemplateVersion,
@@ -183,6 +184,131 @@ export async function publishTemplateRelease(input: {
       },
     });
   });
+}
+
+export type AuditTemplateCatalogItem = AuditTemplateSummary & {
+  sectionCount: number;
+  auditCount: number;
+  supersededAt: string | null;
+};
+
+function countSectionsInTemplate(sections: unknown): number {
+  return Array.isArray(sections) ? sections.length : 0;
+}
+
+export async function listAuditTemplateCatalog(): Promise<AuditTemplateCatalogItem[]> {
+  const templates = await prisma.auditTemplate.findMany({
+    orderBy: [{ version: "desc" }, { revision: "desc" }],
+    include: {
+      _count: { select: { audits: true } },
+    },
+  });
+
+  return templates.map((template) => ({
+    ...toTemplateSummary(template),
+    sectionCount: countSectionsInTemplate(template.sections),
+    auditCount: template._count.audits,
+    supersededAt: template.supersededAt?.toISOString() ?? null,
+  }));
+}
+
+export async function listSelectableAuditTemplates(): Promise<AuditTemplateSummary[]> {
+  const templates = await prisma.auditTemplate.findMany({
+    orderBy: [{ version: "desc" }, { revision: "desc" }],
+  });
+
+  const latestByVersion = new Map<string, AuditTemplate>();
+
+  for (const template of templates) {
+    if (!latestByVersion.has(template.version)) {
+      latestByVersion.set(template.version, template);
+    }
+  }
+
+  return Array.from(latestByVersion.values()).map(toTemplateSummary);
+}
+
+export async function getAuditTemplateById(
+  templateId: string,
+): Promise<AuditTemplate | null> {
+  return prisma.auditTemplate.findUnique({
+    where: { id: templateId },
+  });
+}
+
+export async function activateAuditTemplate(
+  templateId: string,
+): Promise<AuditTemplateSummary> {
+  const template = await prisma.auditTemplate.findUnique({
+    where: { id: templateId },
+  });
+
+  if (!template) {
+    throw new Error("Template not found");
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.auditTemplate.updateMany({
+      where: { isActive: true },
+      data: {
+        isActive: false,
+        supersededAt: new Date(),
+      },
+    });
+
+    return tx.auditTemplate.update({
+      where: { id: templateId },
+      data: {
+        isActive: true,
+        supersededAt: null,
+      },
+    });
+  });
+
+  return toTemplateSummary(updated);
+}
+
+export async function importAuditTemplateRelease(input: {
+  version: string;
+  publishedAt: Date;
+  sections: AuditTemplateSections;
+  description?: string | null;
+  setActive?: boolean;
+}): Promise<AuditTemplateSummary> {
+  const validationError = validateTemplateSections(input.sections);
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
+  const existing = await getLatestRevisionForVersion(input.version);
+  if (existing) {
+    throw new Error(
+      `Template version ${input.version} already exists. Publish a patch instead.`,
+    );
+  }
+
+  const template = input.setActive === false
+    ? await prisma.auditTemplate.create({
+        data: {
+          version: input.version,
+          revision: 1,
+          changeType: "RELEASE",
+          description: input.description ?? null,
+          publishedAt: input.publishedAt,
+          sections: input.sections,
+          isActive: false,
+        },
+      })
+    : (
+        await publishTemplateRelease({
+          version: input.version,
+          publishedAt: input.publishedAt,
+          sections: input.sections,
+          description: input.description ?? undefined,
+        })
+      );
+
+  return toTemplateSummary(template);
 }
 
 export function defaultAuditDate(date = new Date()): Date {

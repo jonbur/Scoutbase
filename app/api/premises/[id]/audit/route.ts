@@ -10,6 +10,7 @@ import {
 import {
   defaultAuditDate,
   getActiveAuditTemplateSummary,
+  listSelectableAuditTemplates,
 } from "@/lib/audit-templates";
 import { getPremisesForOrganisation } from "@/lib/premises";
 import { isInputDate, parseInputDate } from "@/lib/dates";
@@ -32,16 +33,17 @@ export async function GET(_request: Request, { params }: RouteParams) {
       );
     }
 
-    const [draft, audits, activeTemplate] = await Promise.all([
+    const [draft, audits, activeTemplate, templates] = await Promise.all([
       prisma.audit.findFirst({
         where: {
           premisesId: params.id,
           status: AuditStatus.DRAFT,
         },
-        select: { id: true, startedAt: true, auditDate: true },
+        select: { id: true, startedAt: true, auditDate: true, templateId: true },
       }),
       listPremisesAudits(params.id, auth.organisationId),
       getActiveAuditTemplateSummary(),
+      listSelectableAuditTemplates(),
     ]);
 
     const canStartNewAudit = !draft;
@@ -52,6 +54,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         draftAudit: draft,
         audits,
         activeTemplate,
+        templates,
         defaultAuditDate: defaultAuditDate().toISOString().slice(0, 10),
         canStartNewAudit,
       },
@@ -92,11 +95,21 @@ export async function POST(request: Request, { params }: RouteParams) {
         );
       }
 
+      const templateId =
+        body &&
+        typeof body === "object" &&
+        typeof (body as { templateId?: unknown }).templateId === "string"
+          ? (body as { templateId: string }).templateId
+          : undefined;
+
       const { audit, created } = await startNewAudit(
         params.id,
         auth.organisationId,
         auth.userId,
-        parseInputDate(auditDateInput)!,
+        {
+          auditDate: parseInputDate(auditDateInput)!,
+          templateId,
+        },
       );
 
       return NextResponse.json({

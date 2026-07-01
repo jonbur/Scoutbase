@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { AuditStatus } from "@prisma/client";
-import { AuditStartPanel } from "@/components/audit/AuditStartPanel";
+import { AuditsManager } from "@/components/audit/AuditsManager";
 import { PremisesPageHeader } from "@/components/premises/PremisesPageHeader";
 import { requireAuthContext } from "@/lib/auth";
 import { getPremisesForOrganisation } from "@/lib/premises";
@@ -38,11 +38,12 @@ export default async function PremisesAuditPage({ params }: PageProps) {
         premisesId={premises.id}
         premisesName={premises.name}
         address={premises.address}
-        eyebrow="Annual safety audit"
+        eyebrow="Audits"
+        description="View past audits, start a new one against a chosen template, or continue a draft."
       />
 
       <div className="mt-8">
-        <AuditStartPanel
+        <AuditsManager
           premisesId={premises.id}
           premisesName={premises.name}
           hasProfile={Boolean(premises.profile)}

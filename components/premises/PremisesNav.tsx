@@ -9,7 +9,7 @@ type PremisesNavProps = {
 
 const links = [
   { href: (id: string) => `/premises/${id}/profile`, label: "Profile" },
-  { href: (id: string) => `/premises/${id}/audit`, label: "Audit" },
+  { href: (id: string) => `/premises/${id}/audit`, label: "Audits" },
   { href: (id: string) => `/premises/${id}/actions`, label: "Actions" },
 ] as const;
 
