@@ -205,6 +205,8 @@ export function QuestionCard({
   }, [item.id, sectionId]);
 
   const showYesDetails = !isOpenTextQuestion && !isDateQuestion && response === "YES";
+  const showActionsPanel =
+    isOpenTextQuestion || isDateQuestion || response !== "NA";
 
   async function persist(next: QuestionSavePayload) {
     const error = canSave(item, next);
@@ -411,13 +413,15 @@ export function QuestionCard({
         <p className="mt-3 text-sm text-red-600">{validationError}</p>
       ) : null}
 
-      <ItemActionPanel
-        item={item}
-        deletingActionId={deletingActionId}
-        onAddAction={onAddAction}
-        onEditAction={onEditAction}
-        onDeleteAction={onDeleteAction}
-      />
+      {showActionsPanel ? (
+        <ItemActionPanel
+          item={item}
+          deletingActionId={deletingActionId}
+          onAddAction={onAddAction}
+          onEditAction={onEditAction}
+          onDeleteAction={onDeleteAction}
+        />
+      ) : null}
     </article>
   );
 }
