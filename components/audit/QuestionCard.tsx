@@ -140,17 +140,6 @@ export function QuestionCard({
         />
       </div>
 
-      {showNeedsAction ? (
-        <div className="mt-4">
-          <ToggleField
-            label="Needs action"
-            description="Tick if a follow-up task should be tracked for this item."
-            checked={needsAction}
-            onChange={handleNeedsActionChange}
-          />
-        </div>
-      ) : null}
-
       {showDetails ? (
         <div className="mt-4">
           <label
@@ -168,6 +157,17 @@ export function QuestionCard({
             onBlur={handleNotesBlur}
             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:opacity-50"
             placeholder="Describe what is in place, any evidence, or context for your answer"
+          />
+        </div>
+      ) : null}
+
+      {showNeedsAction ? (
+        <div className="mt-4">
+          <ToggleField
+            label="Needs action"
+            description="Tick if a follow-up task should be tracked for this item."
+            checked={needsAction}
+            onChange={handleNeedsActionChange}
           />
         </div>
       ) : null}
