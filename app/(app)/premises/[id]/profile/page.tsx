@@ -4,6 +4,7 @@ import { requireAuthContext } from "@/lib/auth";
 import { getPremisesForOrganisation } from "@/lib/premises";
 import { EMPTY_PROFILE_FORM } from "@/lib/profile-labels";
 import { ProfileWizard } from "@/components/profile/ProfileWizard";
+import { PremisesPageHeader } from "@/components/premises/PremisesPageHeader";
 import type { ProfileFormData } from "@/lib/profile-labels";
 import type { BuildingAgeBand, FloodRiskZone, OwnershipType } from "@prisma/client";
 
@@ -59,14 +60,13 @@ export default async function PremisesProfilePage({ params }: PageProps) {
 
   return (
     <div>
-      <p className="text-sm font-medium text-emerald-700">Premises profile</p>
-      <h1 className="mt-1 text-2xl font-semibold text-slate-900">{premises.name}</h1>
-      <p className="mt-1 text-slate-600">{premises.address}</p>
-      <p className="mt-4 text-sm text-slate-600">
-        Answer a few questions about your premises. We&apos;ll tailor the annual
-        safety audit to what applies to your building — usually about five
-        minutes.
-      </p>
+      <PremisesPageHeader
+        premisesId={premises.id}
+        premisesName={premises.name}
+        address={premises.address}
+        eyebrow="Premises profile"
+        description="Answer a few questions about your premises. We'll tailor the annual safety audit to what applies to your building — usually about five minutes."
+      />
       {premises.profile ? (
         <Link
           href={`/premises/${premises.id}/audit`}
