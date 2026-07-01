@@ -1,5 +1,6 @@
-import { OrgType, Role, PrismaClient } from "@prisma/client";
+import { OrgType, Role, PrismaClient, OwnershipType, BuildingAgeBand, FloodRiskZone } from "@prisma/client";
 import { DEV_USER_ID } from "../lib/auth";
+import { computeApplicableSections } from "../lib/sections";
 import { auditTemplate202509 } from "./data/audit-template-2025-09";
 
 const prisma = new PrismaClient();
@@ -73,9 +74,37 @@ async function main() {
     },
   });
 
+  const profileInput = {
+    buildingAgeBand: BuildingAgeBand.PRE_1985,
+    hasGas: true,
+    hasSleeping: false,
+    hasCateringKitchen: false,
+    hasGrounds: true,
+    hasVehicles: false,
+    hasPlantMachinery: false,
+    hasThirdPartyUsers: false,
+    floodRiskZone: FloodRiskZone.LOW,
+  };
+
+  await prisma.premisesProfile.upsert({
+    where: { premisesId: premises.id },
+    update: {
+      ownershipType: OwnershipType.OWNED,
+      ...profileInput,
+      applicableSections: computeApplicableSections(profileInput),
+    },
+    create: {
+      premisesId: premises.id,
+      ownershipType: OwnershipType.OWNED,
+      ...profileInput,
+      applicableSections: computeApplicableSections(profileInput),
+    },
+  });
+
   console.log(`Dev organisation: ${organisation.name} (${organisation.id})`);
   console.log(`Dev premises: ${premises.name} (${premises.id})`);
   console.log(`  Profile wizard: /premises/${premises.id}/profile`);
+  console.log(`  Audit wizard:   /premises/${premises.id}/audit`);
 }
 
 main()

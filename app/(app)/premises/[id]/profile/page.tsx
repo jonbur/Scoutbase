@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { requireAuthContext } from "@/lib/auth";
 import { getPremisesForOrganisation } from "@/lib/premises";
 import { EMPTY_PROFILE_FORM } from "@/lib/profile-labels";
@@ -66,6 +67,14 @@ export default async function PremisesProfilePage({ params }: PageProps) {
         safety audit to what applies to your building — usually about five
         minutes.
       </p>
+      {premises.profile ? (
+        <Link
+          href={`/premises/${premises.id}/audit`}
+          className="mt-4 inline-flex text-sm font-medium text-emerald-700 hover:text-emerald-800"
+        >
+          Go to annual audit →
+        </Link>
+      ) : null}
       <div className="mt-8">
         <ProfileWizard
           premisesId={premises.id}

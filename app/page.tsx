@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 export default async function Home() {
   const premises = await prisma.premises.findFirst({
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true },
+    select: { id: true, name: true, profile: { select: { id: true } } },
   });
 
   return (
@@ -14,12 +14,22 @@ export default async function Home() {
         Compliance management for volunteer-run community buildings
       </p>
       {premises ? (
-        <Link
-          href={`/premises/${premises.id}/profile`}
-          className="mt-8 rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-800"
-        >
-          Set up {premises.name} profile
-        </Link>
+        <div className="mt-8 flex flex-col items-center gap-3">
+          <Link
+            href={`/premises/${premises.id}/profile`}
+            className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            {premises.profile ? "Edit" : "Set up"} {premises.name} profile
+          </Link>
+          {premises.profile ? (
+            <Link
+              href={`/premises/${premises.id}/audit`}
+              className="rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-800"
+            >
+              Start annual audit
+            </Link>
+          ) : null}
+        </div>
       ) : (
         <p className="mt-8 text-sm text-slate-500">
           Run <code className="rounded bg-slate-100 px-1">npm run db:seed</code>{" "}

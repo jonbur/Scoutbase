@@ -1,5 +1,13 @@
 export type { AuditTemplateItem, AuditTemplateSection, AuditTemplateSections } from "./audit-template";
 
+export type {
+  AuditOverview,
+  AuditSectionPayload,
+  AuditSectionSummary,
+  AuditItemWithResponse,
+} from "./audit";
+export { RESPONSE_LABELS, SECTION_STATUS_LABELS } from "./audit";
+
 export type { ProfileForSections } from "@/lib/sections";
 
 export {
