@@ -6,10 +6,13 @@ export type AuditTemplateItem = {
   tags: string[];
 };
 
+export type AuditSectionScope = "all" | "extended";
+
 export type AuditTemplateSection = {
   id: string;
   number: number;
   title: string;
+  scope: AuditSectionScope;
   items: AuditTemplateItem[];
 };
 
