@@ -1,5 +1,7 @@
 export type { AuditTemplateItem, AuditTemplateSection, AuditTemplateSections } from "./audit-template";
 
+export type { ProfileForSections } from "@/lib/sections";
+
 export {
   OrgType,
   Role,
