@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type {
   BuildingAgeBand,
   FloodRiskZone,
@@ -61,6 +61,8 @@ export function ProfileWizard({
 }: ProfileWizardProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const [form, setForm] = useState<ProfileFormData>(initialProfile);
+  const formRef = useRef(form);
+  formRef.current = form;
   const [savedSections, setSavedSections] = useState(initialApplicableSections);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,12 +72,17 @@ export function ProfileWizard({
   const currentStep = PROFILE_STEPS[stepIndex];
 
   function updateForm(patch: Partial<ProfileFormData>) {
-    setForm((current) => ({ ...current, ...patch }));
+    setForm((current) => {
+      const next = { ...current, ...patch };
+      formRef.current = next;
+      return next;
+    });
     setSaved(false);
     setError(null);
   }
 
-  async function saveProfile() {
+  async function persistProfile(options?: { markSaved?: boolean }) {
+    const currentForm = formRef.current;
     setIsSaving(true);
     setError(null);
 
@@ -83,7 +90,7 @@ export function ProfileWizard({
       const response = await fetch(`/api/premises/${premisesId}/profile`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(currentForm),
       });
 
       const result = await response.json();
@@ -92,19 +99,30 @@ export function ProfileWizard({
         throw new Error(result.error ?? "Failed to save profile");
       }
 
+      setForm(result.data.profile);
+      formRef.current = result.data.profile;
       setSavedSections(result.data.applicableSections);
-      setSaved(true);
+      if (options?.markSaved) {
+        setSaved(true);
+      }
     } catch (saveError) {
       setError(
         saveError instanceof Error ? saveError.message : "Failed to save profile",
       );
+      throw saveError;
     } finally {
       setIsSaving(false);
     }
   }
 
+  async function saveProfile() {
+    await persistProfile({ markSaved: true });
+  }
+
   async function handleNext() {
-    if (!canProceed(stepIndex, form)) {
+    const currentForm = formRef.current;
+
+    if (!canProceed(stepIndex, currentForm)) {
       setError("Please answer the required questions before continuing.");
       return;
     }
@@ -112,11 +130,23 @@ export function ProfileWizard({
     setError(null);
 
     if (stepIndex < PROFILE_STEPS.length - 1) {
+      if (currentForm.ownershipType && currentForm.buildingAgeBand) {
+        try {
+          await persistProfile();
+        } catch {
+          return;
+        }
+      }
+
       setStepIndex((index) => index + 1);
       return;
     }
 
-    await saveProfile();
+    try {
+      await saveProfile();
+    } catch {
+      return;
+    }
   }
 
   function handleContinuePointerDown(
