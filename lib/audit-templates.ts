@@ -185,6 +185,8 @@ export async function publishTemplateRelease(input: {
   });
 }
 
-export function currentAuditYear(date = new Date()): number {
-  return date.getUTCFullYear();
+export function defaultAuditDate(date = new Date()): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
 }

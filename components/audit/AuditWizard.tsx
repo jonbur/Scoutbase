@@ -23,6 +23,14 @@ type AuditWizardProps = {
   initialSectionId: string;
 };
 
+function formatDisplayDate(value: string): string {
+  return new Date(`${value}T00:00:00`).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 type ActionDialogState = {
   item: AuditItemWithResponse;
   existingAction: AuditLinkedAction | null;
@@ -394,8 +402,8 @@ export function AuditWizard({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm text-slate-500">
-              {overview.auditYear} audit · Template {overview.templateLabel} ·{" "}
-              {isReadOnly ? "Completed" : "Draft"}
+              Audit {formatDisplayDate(overview.auditDate)} · Template{" "}
+              {overview.templateLabel} · {isReadOnly ? "Completed" : "Draft"}
             </p>
             <h1 className="text-xl font-semibold text-slate-900">
               {overview.premises.name}

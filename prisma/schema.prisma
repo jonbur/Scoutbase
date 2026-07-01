@@ -95,7 +95,7 @@ model Audit {
   templateId       String
   template         AuditTemplate   @relation(fields: [templateId], references: [id])
   templateRevision Int
-  auditYear        Int
+  auditDate        DateTime        @db.Date
   sectionsSnapshot Json?
   status           AuditStatus
   startedBy        String
@@ -105,7 +105,7 @@ model Audit {
   sections         AuditSection[]
 
   @@index([premisesId])
-  @@index([premisesId, auditYear])
+  @@index([premisesId, auditDate])
   @@index([templateId])
 }
 

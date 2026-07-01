@@ -4,14 +4,15 @@ import { requireAuthContext } from "@/lib/auth";
 import {
   buildAuditOverview,
   listPremisesAudits,
-  startNewAnnualAudit,
+  startNewAudit,
   startOrResumeAudit,
 } from "@/lib/audit";
 import {
-  currentAuditYear,
+  defaultAuditDate,
   getActiveAuditTemplateSummary,
 } from "@/lib/audit-templates";
 import { getPremisesForOrganisation } from "@/lib/premises";
+import { isInputDate, parseInputDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 
 type RouteParams = { params: { id: string } };
@@ -37,15 +38,13 @@ export async function GET(_request: Request, { params }: RouteParams) {
           premisesId: params.id,
           status: AuditStatus.DRAFT,
         },
-        select: { id: true, startedAt: true, auditYear: true },
+        select: { id: true, startedAt: true, auditDate: true },
       }),
       listPremisesAudits(params.id, auth.organisationId),
       getActiveAuditTemplateSummary(),
     ]);
 
-    const currentYear = currentAuditYear();
-    const canStartNewAudit =
-      !draft && !audits.some((audit) => audit.auditYear === currentYear);
+    const canStartNewAudit = !draft;
 
     return NextResponse.json({
       data: {
@@ -53,7 +52,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
         draftAudit: draft,
         audits,
         activeTemplate,
-        currentAuditYear: currentYear,
+        defaultAuditDate: defaultAuditDate().toISOString().slice(0, 10),
         canStartNewAudit,
       },
       error: null,
@@ -79,18 +78,25 @@ export async function POST(request: Request, { params }: RouteParams) {
         : "resume";
 
     if (action === "start") {
-      const auditYear =
+      const auditDateInput =
         body &&
         typeof body === "object" &&
-        typeof (body as { auditYear?: unknown }).auditYear === "number"
-          ? (body as { auditYear: number }).auditYear
-          : currentAuditYear();
+        typeof (body as { auditDate?: unknown }).auditDate === "string"
+          ? (body as { auditDate: string }).auditDate
+          : defaultAuditDate().toISOString().slice(0, 10);
 
-      const { audit, created } = await startNewAnnualAudit(
+      if (!isInputDate(auditDateInput)) {
+        return NextResponse.json(
+          { data: null, error: "Invalid audit date" },
+          { status: 400 },
+        );
+      }
+
+      const { audit, created } = await startNewAudit(
         params.id,
         auth.organisationId,
         auth.userId,
-        auditYear,
+        parseInputDate(auditDateInput)!,
       );
 
       return NextResponse.json({
@@ -126,7 +132,6 @@ export async function POST(request: Request, { params }: RouteParams) {
           ? 404
           : message.includes("profile") ||
               message.includes("sections") ||
-              message.includes("already exists") ||
               message.includes("draft audit")
             ? 400
             : 500;

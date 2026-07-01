@@ -16,7 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { getPremisesForOrganisation } from "@/lib/premises";
 import {
   collectAnswerableItemIds,
-  currentAuditYear,
+  defaultAuditDate,
   getActiveAuditTemplate,
   getAuditTemplateSections,
   parseTemplateSections,
@@ -56,7 +56,7 @@ export type AuditWithRelations = Audit & {
 
 export type AuditListItem = {
   id: string;
-  auditYear: number;
+  auditDate: string;
   status: AuditStatus;
   templateVersion: string;
   templateRevision: number;
@@ -291,14 +291,14 @@ export async function listPremisesAudits(
   const audits = await prisma.audit.findMany({
     where: { premisesId },
     include: auditWithRelationsInclude,
-    orderBy: [{ auditYear: "desc" }, { startedAt: "desc" }],
+    orderBy: [{ auditDate: "desc" }, { startedAt: "desc" }],
   });
 
   return audits.map((audit) => {
     const overview = buildAuditOverview(audit as AuditWithRelations);
     return {
       id: audit.id,
-      auditYear: audit.auditYear,
+      auditDate: toRecordedDateIso(audit.auditDate)!,
       status: audit.status,
       templateVersion: audit.template.version,
       templateRevision: audit.templateRevision,
@@ -349,14 +349,14 @@ export async function startOrResumeAudit(
     };
   }
 
-  return startNewAnnualAudit(premisesId, organisationId, userId);
+  return startNewAudit(premisesId, organisationId, userId);
 }
 
-export async function startNewAnnualAudit(
+export async function startNewAudit(
   premisesId: string,
   organisationId: string,
   userId: string,
-  auditYear = currentAuditYear(),
+  auditDate: Date = defaultAuditDate(),
 ): Promise<{ audit: AuditWithRelations; created: boolean }> {
   const premises = await getPremisesForOrganisation(premisesId, organisationId);
 
@@ -375,15 +375,6 @@ export async function startNewAnnualAudit(
 
   if (existingDraft) {
     throw new Error("Finish or continue the draft audit before starting another");
-  }
-
-  const existingForYear = await prisma.audit.findFirst({
-    where: { premisesId, auditYear },
-    select: { id: true, status: true },
-  });
-
-  if (existingForYear) {
-    throw new Error(`An audit for ${auditYear} already exists`);
   }
 
   const template = await getActiveAuditTemplate();
@@ -407,7 +398,7 @@ export async function startNewAnnualAudit(
       premisesId,
       templateId: template.id,
       templateRevision: template.revision,
-      auditYear,
+      auditDate,
       status: AuditStatus.DRAFT,
       startedBy: userId,
       sections: {
@@ -911,7 +902,7 @@ export function buildAuditOverview(audit: AuditWithRelations) {
   return {
     id: audit.id,
     status: audit.status,
-    auditYear: audit.auditYear,
+    auditDate: toRecordedDateIso(audit.auditDate)!,
     templateVersion: audit.template.version,
     templateRevision: audit.templateRevision,
     templateLabel: formatTemplateLabel(

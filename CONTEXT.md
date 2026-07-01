@@ -117,7 +117,7 @@ model AuditTemplate {
   @@unique([version, revision])
 }
 
-// Each premises may have multiple audits over time (typically one per year).
+// Each premises may have multiple audits over time. There is no one-audit-per-year rule.
 // Draft audits follow the latest revision of the active template.
 // Completed audits store a sectionsSnapshot so template patches do not rewrite history.
 
@@ -128,7 +128,7 @@ model Audit {
   templateId       String
   template         AuditTemplate @relation(fields: [templateId], references: [id])
   templateRevision Int           // pinned at start; updated for drafts on template sync
-  auditYear        Int           // compliance year, e.g. 2025
+  auditDate        DateTime      @db.Date    // date of the inspection/review (not enforced annually)
   sectionsSnapshot Json?         // frozen template JSON when status becomes COMPLETE
   status           AuditStatus   // DRAFT | COMPLETE
   startedBy        String        // userId

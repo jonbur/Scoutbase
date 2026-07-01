@@ -22,7 +22,7 @@ export type AuditSectionSummary = {
 export type AuditOverview = {
   id: string;
   status: string;
-  auditYear: number;
+  auditDate: string;
   templateVersion: string;
   templateRevision: number;
   templateLabel: string;
@@ -40,7 +40,7 @@ export type AuditOverview = {
 
 export type AuditHistoryItem = {
   id: string;
-  auditYear: number;
+  auditDate: string;
   status: string;
   templateLabel: string;
   startedAt: string;

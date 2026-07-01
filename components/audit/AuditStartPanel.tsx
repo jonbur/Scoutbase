@@ -18,11 +18,11 @@ type AuditStartPanelProps = {
   premisesName: string;
   hasProfile: boolean;
   draftAuditId: string | null;
-  draftAuditYear?: number | null;
+  draftAuditDate?: string | null;
 };
 
 function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString("en-GB", {
+  return new Date(`${value}T00:00:00`).toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -34,7 +34,7 @@ export function AuditStartPanel({
   premisesName,
   hasProfile,
   draftAuditId,
-  draftAuditYear,
+  draftAuditDate,
 }: AuditStartPanelProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -43,7 +43,8 @@ export function AuditStartPanel({
   const [activeTemplate, setActiveTemplate] = useState<ActiveTemplate | null>(
     null,
   );
-  const [currentAuditYear, setCurrentAuditYear] = useState<number | null>(null);
+  const [defaultAuditDate, setDefaultAuditDate] = useState("");
+  const [auditDate, setAuditDate] = useState("");
   const [canStartNewAudit, setCanStartNewAudit] = useState(false);
 
   useEffect(() => {
@@ -60,9 +61,11 @@ export function AuditStartPanel({
           throw new Error(result.error ?? "Failed to load audit history");
         }
 
+        const nextDefaultDate = result.data.defaultAuditDate ?? "";
         setAudits(result.data.audits ?? []);
         setActiveTemplate(result.data.activeTemplate ?? null);
-        setCurrentAuditYear(result.data.currentAuditYear ?? null);
+        setDefaultAuditDate(nextDefaultDate);
+        setAuditDate(nextDefaultDate);
         setCanStartNewAudit(Boolean(result.data.canStartNewAudit));
       } catch (loadError) {
         setError(
@@ -86,7 +89,7 @@ export function AuditStartPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
           action === "start"
-            ? { action: "start", auditYear: currentAuditYear }
+            ? { action: "start", auditDate }
             : { action: "resume" },
         ),
       });
@@ -134,11 +137,11 @@ export function AuditStartPanel({
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">Annual safety audit</h2>
+        <h2 className="text-lg font-semibold text-slate-900">Safety audit</h2>
         <p className="mt-2 text-sm text-slate-600">
           Work through the Scout Association premises audit section by section.
-          Each audit is tied to a template version and compliance year. You can
-          save progress and return later.
+          Each audit is tied to a template version and audit date. You can save
+          progress and return later.
         </p>
 
         {activeTemplate ? (
@@ -153,12 +156,27 @@ export function AuditStartPanel({
         {draftAuditId ? (
           <p className="mt-4 text-sm text-emerald-800">
             You have a draft audit in progress
-            {draftAuditYear ? ` for ${draftAuditYear}` : ""}.
+            {draftAuditDate ? ` dated ${formatDate(draftAuditDate)}` : ""}.
           </p>
-        ) : canStartNewAudit && currentAuditYear ? (
-          <p className="mt-4 text-sm text-slate-600">
-            No audit started for {currentAuditYear} yet.
-          </p>
+        ) : canStartNewAudit ? (
+          <div className="mt-4">
+            <label
+              htmlFor="audit-date"
+              className="block text-sm font-medium text-slate-700"
+            >
+              Audit date
+            </label>
+            <input
+              id="audit-date"
+              type="date"
+              value={auditDate}
+              onChange={(event) => setAuditDate(event.target.value)}
+              className="mt-1 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Usually the date of the inspection or review. Defaults to today.
+            </p>
+          </div>
         ) : null}
 
         {error ? (
@@ -174,10 +192,11 @@ export function AuditStartPanel({
               Continue audit
             </Link>
           ) : canStartNewAudit ? (
-            <Button onClick={() => startAudit("start")} disabled={loading}>
-              {loading
-                ? "Starting…"
-                : `Start ${currentAuditYear ?? ""} audit`.trim()}
+            <Button
+              onClick={() => startAudit("start")}
+              disabled={loading || !auditDate}
+            >
+              {loading ? "Starting…" : "Start audit"}
             </Button>
           ) : (
             <Button onClick={() => startAudit("resume")} disabled={loading}>
@@ -198,7 +217,7 @@ export function AuditStartPanel({
               >
                 <div>
                   <p className="text-sm font-medium text-slate-900">
-                    {audit.auditYear} audit
+                    Audit · {formatDate(audit.auditDate)}
                   </p>
                   <p className="text-xs text-slate-500">
                     Template {audit.templateLabel} ·{" "}
@@ -207,9 +226,9 @@ export function AuditStartPanel({
                     {audit.progress.totalSections} sections
                   </p>
                   <p className="text-xs text-slate-500">
-                    Started {formatDate(audit.startedAt)}
+                    Started {formatDate(audit.startedAt.slice(0, 10))}
                     {audit.completedAt
-                      ? ` · Completed ${formatDate(audit.completedAt)}`
+                      ? ` · Completed ${formatDate(audit.completedAt.slice(0, 10))}`
                       : ""}
                   </p>
                 </div>
