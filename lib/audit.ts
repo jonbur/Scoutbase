@@ -13,6 +13,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getPremisesForOrganisation } from "@/lib/premises";
 import { filterApplicableItems, isTextResponseComplete } from "@/lib/audit-items";
+import { computeApplicableSections } from "@/lib/sections";
 import type {
   AuditTemplateItem,
   AuditTemplateSection,
@@ -35,7 +36,20 @@ export function parseTemplateSections(sections: unknown): AuditTemplateSections 
   return sections as AuditTemplateSections;
 }
 
-export async function getAuditForOrganisation(
+const auditWithRelationsInclude = {
+  sections: { orderBy: { sectionId: "asc" as const } },
+  responses: true,
+  template: { select: { version: true, sections: true } },
+  premises: {
+    select: {
+      id: true,
+      name: true,
+      profile: true,
+    },
+  },
+};
+
+async function fetchAuditWithRelations(
   auditId: string,
   organisationId: string,
 ): Promise<AuditWithRelations | null> {
@@ -44,19 +58,125 @@ export async function getAuditForOrganisation(
       id: auditId,
       premises: { organisationId },
     },
-    include: {
-      sections: { orderBy: { sectionId: "asc" } },
-      responses: true,
-      template: { select: { version: true, sections: true } },
-      premises: {
-        select: {
-          id: true,
-          name: true,
-          profile: true,
-        },
-      },
-    },
+    include: auditWithRelationsInclude,
   }) as Promise<AuditWithRelations | null>;
+}
+
+function applicableSectionsMatch(
+  current: string[],
+  target: string[],
+): boolean {
+  if (current.length !== target.length) {
+    return false;
+  }
+
+  return current.every((sectionId, index) => sectionId === target[index]);
+}
+
+export async function syncDraftAudit(
+  audit: AuditWithRelations,
+): Promise<AuditWithRelations> {
+  if (audit.status !== AuditStatus.DRAFT) {
+    return audit;
+  }
+
+  const profile = audit.premises.profile;
+  if (!profile) {
+    return audit;
+  }
+
+  const activeTemplate = await prisma.auditTemplate.findFirst({
+    where: { isActive: true },
+    orderBy: { publishedAt: "desc" },
+  });
+
+  if (!activeTemplate) {
+    return audit;
+  }
+
+  const applicableSections = computeApplicableSections(profile);
+  const currentSectionIds = new Set(
+    audit.sections.map((section) => section.sectionId),
+  );
+  const sectionsToRemove = audit.sections
+    .filter((section) => !applicableSections.includes(section.sectionId))
+    .map((section) => section.sectionId);
+  const sectionsToAdd = applicableSections.filter(
+    (sectionId) => !currentSectionIds.has(sectionId),
+  );
+  const profileSectionsChanged = !applicableSectionsMatch(
+    profile.applicableSections,
+    applicableSections,
+  );
+  const needsTemplateUpdate = audit.templateId !== activeTemplate.id;
+
+  if (
+    !needsTemplateUpdate &&
+    sectionsToRemove.length === 0 &&
+    sectionsToAdd.length === 0 &&
+    !profileSectionsChanged
+  ) {
+    return audit;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    if (profileSectionsChanged) {
+      await tx.premisesProfile.update({
+        where: { premisesId: audit.premisesId },
+        data: { applicableSections },
+      });
+    }
+
+    if (needsTemplateUpdate) {
+      await tx.audit.update({
+        where: { id: audit.id },
+        data: { templateId: activeTemplate.id },
+      });
+    }
+
+    if (sectionsToRemove.length > 0) {
+      await tx.auditSection.deleteMany({
+        where: {
+          auditId: audit.id,
+          sectionId: { in: sectionsToRemove },
+        },
+      });
+    }
+
+    if (sectionsToAdd.length > 0) {
+      await tx.auditSection.createMany({
+        data: sectionsToAdd.map((sectionId) => ({
+          auditId: audit.id,
+          sectionId,
+          status: AuditSectionStatus.NOT_STARTED,
+        })),
+      });
+    }
+  });
+
+  const refreshed = await prisma.audit.findUnique({
+    where: { id: audit.id },
+    include: auditWithRelationsInclude,
+  });
+
+  return (refreshed ?? audit) as AuditWithRelations;
+}
+
+export async function getAuditForOrganisation(
+  auditId: string,
+  organisationId: string,
+): Promise<AuditWithRelations | null> {
+  const audit = await fetchAuditWithRelations(auditId, organisationId);
+
+  if (!audit) {
+    return null;
+  }
+
+  if (audit.status === AuditStatus.DRAFT) {
+    return syncDraftAudit(audit);
+  }
+
+  return audit;
 }
 
 export function getTemplateSection(
@@ -112,8 +232,10 @@ export async function startOrResumeAudit(
   });
 
   if (existingDraft) {
+    const audit = await syncDraftAudit(existingDraft as AuditWithRelations);
+
     return {
-      audit: existingDraft as AuditWithRelations,
+      audit,
       created: false,
     };
   }
