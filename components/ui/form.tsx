@@ -115,9 +115,12 @@ export function ToggleField({
 type ButtonProps = {
   children: ReactNode;
   onClick?: () => void;
+  onPointerDown?: (event: React.PointerEvent<HTMLButtonElement>) => void;
   type?: "button" | "submit";
   variant?: "primary" | "secondary";
   disabled?: boolean;
+  className?: string;
+  "aria-disabled"?: boolean;
 };
 
 type DateFieldProps = {
@@ -165,9 +168,12 @@ export function DateField({
 export function Button({
   children,
   onClick,
+  onPointerDown,
   type = "button",
   variant = "primary",
   disabled = false,
+  className = "",
+  "aria-disabled": ariaDisabled,
 }: ButtonProps) {
   const base =
     "inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50";
@@ -180,8 +186,10 @@ export function Button({
     <button
       type={type}
       onClick={onClick}
+      onPointerDown={onPointerDown}
       disabled={disabled}
-      className={`${base} ${styles}`}
+      aria-disabled={ariaDisabled}
+      className={`${base} ${styles} ${className}`.trim()}
     >
       {children}
     </button>

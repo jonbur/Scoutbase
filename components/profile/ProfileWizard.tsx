@@ -104,11 +104,36 @@ export function ProfileWizard({
   }
 
   async function handleNext() {
+    if (!canProceed(stepIndex, form)) {
+      setError("Please answer the required questions before continuing.");
+      return;
+    }
+
+    setError(null);
+
     if (stepIndex < PROFILE_STEPS.length - 1) {
       setStepIndex((index) => index + 1);
       return;
     }
+
     await saveProfile();
+  }
+
+  function handleContinuePointerDown(
+    event: React.PointerEvent<HTMLButtonElement>,
+  ) {
+    if (
+      event.pointerType !== "mouse" ||
+      event.button !== 0 ||
+      isSaving
+    ) {
+      return;
+    }
+
+    // Run on pointer down so the first click still works after choosing a radio
+    // (otherwise blur/focus can swallow the first click on some browsers).
+    event.preventDefault();
+    void handleNext();
   }
 
   function handleBack() {
@@ -343,8 +368,15 @@ export function ProfileWizard({
             </Button>
           ) : null}
           <Button
-            onClick={handleNext}
-            disabled={!canProceed(stepIndex, form) || isSaving}
+            onClick={() => void handleNext()}
+            onPointerDown={handleContinuePointerDown}
+            disabled={isSaving}
+            aria-disabled={!canProceed(stepIndex, form) || isSaving}
+            className={
+              !canProceed(stepIndex, form) && !isSaving
+                ? "opacity-50"
+                : undefined
+            }
           >
             {isSaving
               ? "Saving…"
