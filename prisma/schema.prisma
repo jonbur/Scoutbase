@@ -1,0 +1,329 @@
+// Prisma schema for Vigil — compliance management for volunteer-run premises.
+// See CONTEXT.md for data model documentation.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organisation {
+  id           String         @id @default(cuid())
+  name         String
+  type         OrgType
+  parentId     String?
+  parent       Organisation?  @relation("OrgHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children     Organisation[] @relation("OrgHierarchy")
+  premises     Premises[]
+  memberships  Membership[]
+  createdAt    DateTime       @default(now())
+
+  @@index([parentId])
+}
+
+model Membership {
+  id             String       @id @default(cuid())
+  userId         String
+  organisationId String
+  role           Role
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, organisationId])
+  @@index([organisationId])
+  @@index([userId])
+}
+
+model Premises {
+  id              String           @id @default(cuid())
+  name            String
+  address         String
+  organisationId  String
+  organisation    Organisation     @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  profile         PremisesProfile?
+  audits          Audit[]
+  documents       Document[]
+  actions         Action[]
+  riskAssessments RiskAssessment[]
+  createdAt       DateTime         @default(now())
+
+  @@index([organisationId])
+}
+
+model PremisesProfile {
+  id                 String           @id @default(cuid())
+  premisesId         String           @unique
+  premises           Premises         @relation(fields: [premisesId], references: [id], onDelete: Cascade)
+  ownershipType      OwnershipType
+  buildingAgeBand    BuildingAgeBand
+  hasGas             Boolean          @default(false)
+  hasSleeping        Boolean          @default(false)
+  hasCateringKitchen Boolean          @default(false)
+  hasGrounds         Boolean          @default(false)
+  hasVehicles        Boolean          @default(false)
+  hasPlantMachinery  Boolean          @default(false)
+  hasThirdPartyUsers Boolean          @default(false)
+  floodRiskZone      FloodRiskZone?
+  applicableSections String[]
+  updatedAt          DateTime         @updatedAt
+}
+
+model AuditTemplate {
+  id          String   @id @default(cuid())
+  version     String   @unique
+  publishedAt DateTime
+  sections    Json
+  isActive    Boolean  @default(false)
+  audits      Audit[]
+}
+
+model Audit {
+  id          String          @id @default(cuid())
+  premisesId  String
+  premises    Premises        @relation(fields: [premisesId], references: [id], onDelete: Cascade)
+  templateId  String
+  template    AuditTemplate   @relation(fields: [templateId], references: [id])
+  status      AuditStatus
+  startedBy   String
+  startedAt   DateTime        @default(now())
+  completedAt DateTime?
+  responses   AuditResponse[]
+  sections    AuditSection[]
+
+  @@index([premisesId])
+  @@index([templateId])
+}
+
+model AuditSection {
+  id        String             @id @default(cuid())
+  auditId   String
+  audit     Audit              @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  sectionId String
+  status    AuditSectionStatus
+
+  @@unique([auditId, sectionId])
+  @@index([auditId])
+}
+
+model AuditResponse {
+  id          String        @id @default(cuid())
+  auditId     String
+  audit       Audit         @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  itemId      String
+  response    ResponseValue
+  notes       String?
+  respondedBy String
+  respondedAt DateTime      @default(now())
+
+  @@unique([auditId, itemId])
+  @@index([auditId])
+}
+
+model RiskAssessment {
+  id             String     @id @default(cuid())
+  premisesId     String
+  premises       Premises   @relation(fields: [premisesId], references: [id], onDelete: Cascade)
+  raType         RAType
+  version        Int        @default(1)
+  status         RAStatus
+  createdBy      String
+  createdAt      DateTime   @default(now())
+  completedAt    DateTime?
+  nextReviewDate DateTime?
+  hazards        RAHazard[]
+  document       Document?
+
+  @@index([premisesId])
+}
+
+model RAHazard {
+  id                  String         @id @default(cuid())
+  raId                String
+  ra                  RiskAssessment @relation(fields: [raId], references: [id], onDelete: Cascade)
+  description         String
+  affectedPersons     String[]
+  likelihood          Int
+  severity            Int
+  riskRating          Int
+  existingControls    String
+  residualLikelihood  Int
+  residualSeverity    Int
+  residualRisk        Int
+  furtherActionNeeded Boolean        @default(false)
+  actionId            String?
+  action              Action?        @relation(fields: [actionId], references: [id], onDelete: SetNull)
+
+  @@index([raId])
+  @@index([actionId])
+}
+
+model Document {
+  id          String          @id @default(cuid())
+  premisesId  String
+  premises    Premises        @relation(fields: [premisesId], references: [id], onDelete: Cascade)
+  docType     DocType
+  displayName String
+  storagePath String
+  issueDate   DateTime?
+  expiryDate  DateTime?
+  issuerName  String?
+  status      DocStatus
+  source      DocSource
+  raId        String?         @unique
+  ra          RiskAssessment? @relation(fields: [raId], references: [id], onDelete: SetNull)
+  uploadedBy  String
+  uploadedAt  DateTime        @default(now())
+  reminders   ReminderLog[]
+
+  @@index([premisesId])
+  @@index([expiryDate])
+}
+
+model Action {
+  id              String       @id @default(cuid())
+  premisesId      String
+  premises        Premises     @relation(fields: [premisesId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  sourceType      ActionSourceType?
+  sourceRef       String?
+  sourceItemId    String?
+  priority        Priority
+  assignedTo      String?
+  dueDate         DateTime?
+  status          ActionStatus
+  resolvedAt      DateTime?
+  resolutionNotes String?
+  createdBy       String
+  createdAt       DateTime     @default(now())
+  raHazards       RAHazard[]
+
+  @@index([premisesId])
+  @@index([status])
+}
+
+model ReminderLog {
+  id           String       @id @default(cuid())
+  documentId   String
+  document     Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  reminderType ReminderType
+  sentAt       DateTime     @default(now())
+  recipient    String
+
+  @@index([documentId])
+}
+
+enum OrgType {
+  GROUP
+  DISTRICT
+  COUNTY
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+enum OwnershipType {
+  OWNED
+  LEASED
+  HIRED
+}
+
+enum BuildingAgeBand {
+  PRE_1985
+  Y1985_2000
+  POST_2000
+}
+
+enum FloodRiskZone {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum AuditStatus {
+  DRAFT
+  COMPLETE
+}
+
+enum AuditSectionStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETE
+  SKIPPED
+}
+
+enum ResponseValue {
+  YES
+  NO
+  NA
+  ACTION_NEEDED
+}
+
+enum RAType {
+  FIRE
+  LEGIONELLA
+  COSHH
+  GENERAL
+}
+
+enum RAStatus {
+  DRAFT
+  COMPLETE
+  ARCHIVED
+}
+
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ActionStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum ActionSourceType {
+  AUDIT
+  RA
+  MANUAL
+}
+
+enum DocStatus {
+  CURRENT
+  EXPIRING_SOON
+  EXPIRED
+}
+
+enum DocSource {
+  UPLOAD
+  RA_BUILDER
+}
+
+enum DocType {
+  FIRE_RA
+  EICR
+  GAS_SAFE
+  PAT
+  ASBESTOS
+  LEGIONELLA
+  EMERGENCY_LIGHTING
+  FIRE_EXTINGUISHER
+  FLOOD_RISK
+  CONTRACTOR_INSURANCE
+  OTHER
+}
+
+enum ReminderType {
+  D90
+  D30
+  D7
+  EXPIRED
+}
