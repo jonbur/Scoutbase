@@ -31,6 +31,7 @@ export type AuditResponseRecord = {
   response: ResponseValue;
   needsAction: boolean;
   notes: string | null;
+  recordedDate: string | null;
 };
 
 export type AuditItemWithResponse = {

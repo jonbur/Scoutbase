@@ -120,6 +120,48 @@ type ButtonProps = {
   disabled?: boolean;
 };
 
+type DateFieldProps = {
+  id: string;
+  label: string;
+  value: string;
+  required?: boolean;
+  description?: string;
+  onChange: (value: string) => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+};
+
+export function DateField({
+  id,
+  label,
+  value,
+  required = false,
+  description,
+  onChange,
+  onFocus,
+  onBlur,
+}: DateFieldProps) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-slate-700">
+        {label} {required ? <span className="text-red-600">*</span> : null}
+      </label>
+      {description ? (
+        <p className="mt-1 text-sm text-slate-500">{description}</p>
+      ) : null}
+      <input
+        id={id}
+        type="date"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        className="mt-1 w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+      />
+    </div>
+  );
+}
+
 export function Button({
   children,
   onClick,

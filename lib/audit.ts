@@ -16,8 +16,9 @@ import {
   filterApplicableItems,
   findAnswerableItemInAudit,
   getAnswerableItems,
-  isTextResponseComplete,
+  isAnswerComplete,
 } from "@/lib/audit-items";
+import { isInputDate, parseInputDate, toRecordedDateIso } from "@/lib/dates";
 import { computeApplicableSections } from "@/lib/sections";
 import type {
   AuditTemplateItem,
@@ -25,7 +26,7 @@ import type {
   AuditTemplateSections,
   AnswerableAuditItem,
 } from "@/types/audit-template";
-import { isGroupItem, isTextAnswerItem } from "@/types/audit-template";
+import { isDateUploadItem, isGroupItem, isOpenTextItem, isTextAnswerItem } from "@/types/audit-template";
 
 export type AuditWithRelations = Audit & {
   sections: AuditSection[];
@@ -293,7 +294,7 @@ function isResponseComplete(
   item?: AnswerableAuditItem,
 ): boolean {
   if (item && isTextAnswerItem(item)) {
-    return isTextResponseComplete(item, response.notes);
+    return isAnswerComplete(item, response.notes, response.recordedDate);
   }
 
   if (response.response === ResponseValue.YES) {
@@ -377,6 +378,7 @@ export async function saveAuditResponse(
   options?: {
     notes?: string | null;
     needsAction?: boolean;
+    recordedDate?: string | null;
   },
 ): Promise<{
   response: AuditResponse;
@@ -419,9 +421,19 @@ export async function saveAuditResponse(
 
   let needsAction = options?.needsAction ?? false;
   let notes = options?.notes ?? null;
+  let recordedDate: Date | null = null;
   let storedResponse = response;
 
-  if (isTextAnswerItem(item)) {
+  if (isDateUploadItem(item)) {
+    const dateValue = options?.recordedDate?.trim();
+    if (!dateValue || !isInputDate(dateValue)) {
+      throw new Error("A valid date is required");
+    }
+    storedResponse = ResponseValue.NA;
+    needsAction = false;
+    notes = null;
+    recordedDate = parseInputDate(dateValue);
+  } else if (isOpenTextItem(item)) {
     if (!notes?.trim()) {
       throw new Error("An answer is required");
     }
@@ -447,12 +459,14 @@ export async function saveAuditResponse(
       response: storedResponse,
       needsAction,
       notes: notes?.trim() ? notes.trim() : null,
+      recordedDate,
       respondedBy: userId,
     },
     update: {
       response: storedResponse,
       needsAction,
       notes: notes?.trim() ? notes.trim() : null,
+      recordedDate,
       respondedBy: userId,
       respondedAt: new Date(),
     },
@@ -574,6 +588,7 @@ export function buildAuditSectionPayload(
       response: response.response,
       needsAction: response.needsAction,
       notes: response.notes,
+      recordedDate: toRecordedDateIso(response.recordedDate),
     };
   };
 

@@ -5,7 +5,7 @@ import type {
   AuditTemplateItem,
   AuditTemplateSections,
 } from "@/types/audit-template";
-import { isGroupItem, isTextAnswerItem } from "@/types/audit-template";
+import { isDateUploadItem, isGroupItem, isOpenTextItem } from "@/types/audit-template";
 
 export type ProfileForSections = {
   buildingAgeBand: BuildingAgeBand;
@@ -164,9 +164,26 @@ export function findAnswerableItemInAudit(
   return undefined;
 }
 
+export function isAnswerComplete(
+  item: AnswerableAuditItem,
+  notes: string | null | undefined,
+  recordedDate: Date | string | null | undefined,
+): boolean {
+  if (isDateUploadItem(item)) {
+    return Boolean(recordedDate);
+  }
+
+  if (isOpenTextItem(item)) {
+    return Boolean(notes?.trim());
+  }
+
+  return false;
+}
+
 export function isTextResponseComplete(
   item: AnswerableAuditItem,
   notes: string | null | undefined,
+  recordedDate?: Date | string | null,
 ): boolean {
-  return isTextAnswerItem(item) && Boolean(notes?.trim());
+  return isAnswerComplete(item, notes, recordedDate);
 }

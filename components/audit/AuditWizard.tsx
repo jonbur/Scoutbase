@@ -143,6 +143,7 @@ export function AuditWizard({
           sectionId,
           response: payload.response,
           notes: payload.notes || null,
+          recordedDate: payload.recordedDate || null,
           needsAction: payload.needsAction,
         }),
       });
@@ -158,6 +159,7 @@ export function AuditWizard({
         response: result.data.response.response,
         needsAction: result.data.response.needsAction,
         notes: result.data.response.notes,
+        recordedDate: result.data.response.recordedDate ?? null,
       };
 
       setSectionData((current) => {

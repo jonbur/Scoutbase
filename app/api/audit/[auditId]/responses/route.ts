@@ -20,6 +20,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
     const sectionId = body?.sectionId as string | undefined;
     const response = body?.response as string | undefined;
     const notes = body?.notes as string | null | undefined;
+    const recordedDate = body?.recordedDate as string | null | undefined;
     const needsAction = Boolean(body?.needsAction);
 
     if (!itemId || !sectionId || !response) {
@@ -43,7 +44,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
       itemId,
       sectionId,
       response as ResponseValue,
-      { notes, needsAction },
+      { notes, needsAction, recordedDate },
     );
 
     return NextResponse.json({

@@ -7,13 +7,18 @@ import {
   ResponseInput,
   type PrimaryResponseValue,
 } from "@/components/audit/ResponseInput";
-import { ToggleField } from "@/components/ui/form";
-import { isTextAnswerItem, isDateUploadItem } from "@/types/audit-template";
+import { DateField, ToggleField } from "@/components/ui/form";
+import { formatInputDate, isInputDate } from "@/lib/dates";
+import {
+  isDateUploadItem,
+  isOpenTextItem,
+} from "@/types/audit-template";
 
 export type QuestionSavePayload = {
   response: PrimaryResponseValue | "NA";
   needsAction: boolean;
   notes: string;
+  recordedDate?: string | null;
 };
 
 type QuestionCardProps = {
@@ -33,16 +38,31 @@ type QuestionCardProps = {
 function normalizeStoredResponse(item: AuditItemWithResponse) {
   const stored = item.response;
 
-  if (isTextAnswerItem(item)) {
+  if (isDateUploadItem(item)) {
+    return {
+      response: null as PrimaryResponseValue | null,
+      needsAction: false,
+      notes: "",
+      recordedDate: formatInputDate(stored?.recordedDate),
+    };
+  }
+
+  if (isOpenTextItem(item)) {
     return {
       response: null as PrimaryResponseValue | null,
       needsAction: false,
       notes: stored?.notes ?? "",
+      recordedDate: "",
     };
   }
 
   if (!stored) {
-    return { response: null as PrimaryResponseValue | null, needsAction: false, notes: "" };
+    return {
+      response: null as PrimaryResponseValue | null,
+      needsAction: false,
+      notes: "",
+      recordedDate: "",
+    };
   }
 
   if (stored.response === "ACTION_NEEDED") {
@@ -50,6 +70,7 @@ function normalizeStoredResponse(item: AuditItemWithResponse) {
       response: null as PrimaryResponseValue | null,
       needsAction: true,
       notes: stored.notes ?? "",
+      recordedDate: "",
     };
   }
 
@@ -57,15 +78,21 @@ function normalizeStoredResponse(item: AuditItemWithResponse) {
     response: isPrimaryResponse(stored.response) ? stored.response : null,
     needsAction: stored.needsAction,
     notes: stored.notes ?? "",
+    recordedDate: "",
   };
 }
 
 function canSave(item: AuditItemWithResponse, payload: QuestionSavePayload): string | null {
-  if (isTextAnswerItem(item)) {
+  if (isDateUploadItem(item)) {
+    if (!payload.recordedDate?.trim() || !isInputDate(payload.recordedDate)) {
+      return "Please select a date before saving.";
+    }
+    return null;
+  }
+
+  if (isOpenTextItem(item)) {
     if (!payload.notes.trim()) {
-      return isDateUploadItem(item)
-        ? "Please enter the date or details before saving."
-        : "Please provide an answer before saving.";
+      return "Please provide an answer before saving.";
     }
     return null;
   }
@@ -87,6 +114,7 @@ function storedResponseKey(item: AuditItemWithResponse): string {
     item.response.response,
     item.response.needsAction,
     item.response.notes ?? "",
+    item.response.recordedDate ?? "",
   ].join(":");
 }
 
@@ -105,30 +133,39 @@ export function QuestionCard({
   );
   const [needsAction, setNeedsAction] = useState(initial.needsAction);
   const [notes, setNotes] = useState(initial.notes);
+  const [recordedDate, setRecordedDate] = useState(initial.recordedDate);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stateRef = useRef({ response: initial.response, needsAction: initial.needsAction, notes: initial.notes });
+  const stateRef = useRef({
+    response: initial.response,
+    needsAction: initial.needsAction,
+    notes: initial.notes,
+    recordedDate: initial.recordedDate,
+  });
   const onSaveRef = useRef(onSave);
   const itemRef = useRef(item);
-  const notesFocusedRef = useRef(false);
+  const inputFocusedRef = useRef(false);
 
-  const isTextQuestion = isTextAnswerItem(item);
+  const isOpenTextQuestion = isOpenTextItem(item);
   const isDateQuestion = isDateUploadItem(item);
 
-  stateRef.current = { response, needsAction, notes };
+  stateRef.current = { response, needsAction, notes, recordedDate };
   onSaveRef.current = onSave;
   itemRef.current = item;
+
+  const responseKey = storedResponseKey(item);
 
   useEffect(() => {
     const next = normalizeStoredResponse(item);
     setResponse(next.response);
     setNeedsAction(next.needsAction);
-    if (!notesFocusedRef.current) {
+    if (!inputFocusedRef.current) {
       setNotes(next.notes);
+      setRecordedDate(next.recordedDate);
     }
     setValidationError(null);
-  }, [item.id, storedResponseKey(item)]);
+  }, [item.id, responseKey]);
 
   useEffect(() => {
     return () => {
@@ -140,7 +177,16 @@ export function QuestionCard({
       const current = stateRef.current;
       let payload: QuestionSavePayload | null = null;
 
-      if (isTextAnswerItem(currentItem)) {
+      if (isDateUploadItem(currentItem)) {
+        if (current.recordedDate.trim() && isInputDate(current.recordedDate)) {
+          payload = {
+            response: "NA",
+            needsAction: false,
+            notes: "",
+            recordedDate: current.recordedDate,
+          };
+        }
+      } else if (isOpenTextItem(currentItem)) {
         if (current.notes.trim()) {
           payload = { response: "NA", needsAction: false, notes: current.notes };
         }
@@ -166,8 +212,8 @@ export function QuestionCard({
     };
   }, [item.id, sectionId]);
 
-  const showNeedsAction = !isTextQuestion && (response === "YES" || response === "NO");
-  const showYesDetails = !isTextQuestion && response === "YES";
+  const showNeedsAction = !isOpenTextQuestion && !isDateQuestion && (response === "YES" || response === "NO");
+  const showYesDetails = !isOpenTextQuestion && !isDateQuestion && response === "YES";
 
   async function persist(next: QuestionSavePayload) {
     const error = canSave(item, next);
@@ -234,36 +280,55 @@ export function QuestionCard({
 
   function handleNotesChange(value: string) {
     setNotes(value);
-
-    if (isTextQuestion) {
-      scheduleSave({ response: "NA", needsAction: false, notes: value });
-      return;
-    }
-
-    if (response === "YES") {
-      scheduleSave({ response: "YES", needsAction, notes: value });
-    }
+    scheduleSave({ response: "NA", needsAction: false, notes: value });
   }
 
-  function handleNotesFocus() {
-    notesFocusedRef.current = true;
+  function handleDateChange(value: string) {
+    setRecordedDate(value);
+    scheduleSave({
+      response: "NA",
+      needsAction: false,
+      notes: "",
+      recordedDate: value,
+    });
+  }
+
+  function handleInputFocus() {
+    inputFocusedRef.current = true;
   }
 
   async function handleNotesBlur() {
-    notesFocusedRef.current = false;
+    inputFocusedRef.current = false;
 
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
 
-    if (isTextQuestion) {
+    if (isOpenTextQuestion) {
       await persist({ response: "NA", needsAction: false, notes });
       return;
     }
 
     if (response !== "YES") return;
     await persist({ response, needsAction, notes });
+  }
+
+  async function handleDateBlur() {
+    inputFocusedRef.current = false;
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+
+    if (!isDateQuestion) return;
+    await persist({
+      response: "NA",
+      needsAction: false,
+      notes: "",
+      recordedDate,
+    });
   }
 
   const isSubQuestion = variant === "sub";
@@ -291,34 +356,36 @@ export function QuestionCard({
         </p>
       ) : null}
 
-      {isTextQuestion ? (
+      {isDateQuestion ? (
+        <div className="mt-4">
+          <DateField
+            id={`date-${item.id}`}
+            label="Date"
+            value={recordedDate}
+            required
+            description="Document upload will be added in a later step."
+            onChange={handleDateChange}
+            onFocus={handleInputFocus}
+            onBlur={handleDateBlur}
+          />
+        </div>
+      ) : isOpenTextQuestion ? (
         <div className="mt-4">
           <label
             htmlFor={`notes-${item.id}`}
             className="block text-sm font-medium text-slate-700"
           >
-            {isDateQuestion ? "Date / details" : "Your answer"}{" "}
-            <span className="text-red-600">*</span>
+            Your answer <span className="text-red-600">*</span>
           </label>
-          {isDateQuestion ? (
-            <p className="mt-1 text-sm text-slate-500">
-              Enter the inspection or issue date. Document upload will be added
-              in a later step.
-            </p>
-          ) : null}
           <textarea
             id={`notes-${item.id}`}
             rows={3}
             value={notes}
             onChange={(event) => handleNotesChange(event.target.value)}
-            onFocus={handleNotesFocus}
+            onFocus={handleInputFocus}
             onBlur={handleNotesBlur}
             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
-            placeholder={
-              isDateQuestion
-                ? "e.g. 12 March 2025 — certificate on file in the document vault"
-                : "Type your answer here"
-            }
+            placeholder="Type your answer here"
           />
         </div>
       ) : (
@@ -344,7 +411,7 @@ export function QuestionCard({
                 rows={3}
                 value={notes}
                 onChange={(event) => handleNotesChange(event.target.value)}
-                onFocus={handleNotesFocus}
+                onFocus={handleInputFocus}
                 onBlur={handleNotesBlur}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
                 placeholder="Describe what is in place, any evidence, or context for your answer"
@@ -369,7 +436,7 @@ export function QuestionCard({
         <p className="mt-3 text-sm text-red-600">{validationError}</p>
       ) : null}
 
-      {(needsAction || hasAction) && response && response !== "NA" && !isTextQuestion ? (
+      {(needsAction || hasAction) && response && response !== "NA" && !isOpenTextQuestion && !isDateQuestion ? (
         <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
           <p className="text-sm text-amber-900">
             {hasAction
