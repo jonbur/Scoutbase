@@ -1,5 +1,6 @@
-import type { AuditTemplateSection } from "@/types/audit-template";
+import type { AuditTemplateSection, AuditTemplateSections } from "@/types/audit-template";
 import { auditTemplate202509 } from "@/prisma/data/audit-template-normalized";
+import { getActiveTemplateSections } from "@/lib/audit-templates";
 import {
   matchesProfileFlag,
   type ProfileForSections,
@@ -12,6 +13,10 @@ export const AUDIT_SECTION_IDS = auditTemplate202509.map(
 ) as readonly string[];
 
 export type AuditSectionId = (typeof AUDIT_SECTION_IDS)[number];
+
+export async function getTemplateSectionsForProfile(): Promise<AuditTemplateSections> {
+  return getActiveTemplateSections();
+}
 
 export function isLargerPremises(profile: ProfileForSections): boolean {
   return (

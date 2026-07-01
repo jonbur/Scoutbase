@@ -1,8 +1,19 @@
 import { NextResponse } from "next/server";
 import { AuditStatus } from "@prisma/client";
 import { requireAuthContext } from "@/lib/auth";
-import { buildAuditOverview, startOrResumeAudit } from "@/lib/audit";
+import {
+  buildAuditOverview,
+  listPremisesAudits,
+  startNewAudit,
+  startOrResumeAudit,
+} from "@/lib/audit";
+import {
+  defaultAuditDate,
+  getActiveAuditTemplateSummary,
+  listSelectableAuditTemplates,
+} from "@/lib/audit-templates";
 import { getPremisesForOrganisation } from "@/lib/premises";
+import { isInputDate, parseInputDate } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 
 type RouteParams = { params: { id: string } };
@@ -22,18 +33,30 @@ export async function GET(_request: Request, { params }: RouteParams) {
       );
     }
 
-    const draft = await prisma.audit.findFirst({
-      where: {
-        premisesId: params.id,
-        status: AuditStatus.DRAFT,
-      },
-      select: { id: true, startedAt: true },
-    });
+    const [draft, audits, activeTemplate, templates] = await Promise.all([
+      prisma.audit.findFirst({
+        where: {
+          premisesId: params.id,
+          status: AuditStatus.DRAFT,
+        },
+        select: { id: true, startedAt: true, auditDate: true, templateId: true },
+      }),
+      listPremisesAudits(params.id, auth.organisationId),
+      getActiveAuditTemplateSummary(),
+      listSelectableAuditTemplates(),
+    ]);
+
+    const canStartNewAudit = !draft;
 
     return NextResponse.json({
       data: {
         hasProfile: Boolean(premises.profile),
         draftAudit: draft,
+        audits,
+        activeTemplate,
+        templates,
+        defaultAuditDate: defaultAuditDate().toISOString().slice(0, 10),
+        canStartNewAudit,
       },
       error: null,
     });
@@ -48,9 +71,57 @@ export async function GET(_request: Request, { params }: RouteParams) {
   }
 }
 
-export async function POST(_request: Request, { params }: RouteParams) {
+export async function POST(request: Request, { params }: RouteParams) {
   try {
     const auth = await requireAuthContext();
+    const body = await request.json().catch(() => ({}));
+    const action =
+      body && typeof body === "object" && "action" in body
+        ? String((body as { action?: string }).action)
+        : "resume";
+
+    if (action === "start") {
+      const auditDateInput =
+        body &&
+        typeof body === "object" &&
+        typeof (body as { auditDate?: unknown }).auditDate === "string"
+          ? (body as { auditDate: string }).auditDate
+          : defaultAuditDate().toISOString().slice(0, 10);
+
+      if (!isInputDate(auditDateInput)) {
+        return NextResponse.json(
+          { data: null, error: "Invalid audit date" },
+          { status: 400 },
+        );
+      }
+
+      const templateId =
+        body &&
+        typeof body === "object" &&
+        typeof (body as { templateId?: unknown }).templateId === "string"
+          ? (body as { templateId: string }).templateId
+          : undefined;
+
+      const { audit, created } = await startNewAudit(
+        params.id,
+        auth.organisationId,
+        auth.userId,
+        {
+          auditDate: parseInputDate(auditDateInput)!,
+          templateId,
+        },
+      );
+
+      return NextResponse.json({
+        data: {
+          auditId: audit.id,
+          created,
+          overview: buildAuditOverview(audit),
+        },
+        error: null,
+      });
+    }
+
     const { audit, created } = await startOrResumeAudit(
       params.id,
       auth.organisationId,
@@ -72,7 +143,9 @@ export async function POST(_request: Request, { params }: RouteParams) {
         ? 401
         : message === "Premises not found"
           ? 404
-          : message.includes("profile") || message.includes("sections")
+          : message.includes("profile") ||
+              message.includes("sections") ||
+              message.includes("draft audit")
             ? 400
             : 500;
 

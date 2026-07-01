@@ -88,8 +88,30 @@ export function ToggleField({
   checked,
   onChange,
 }: ToggleFieldProps) {
+  function handleActivate() {
+    onChange(!checked);
+  }
+
   return (
     <label
+      role="checkbox"
+      aria-checked={checked}
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === " " || event.key === "Enter") {
+          event.preventDefault();
+          handleActivate();
+        }
+      }}
+      onPointerDown={(event) => {
+        if (event.pointerType !== "mouse" || event.button !== 0) {
+          return;
+        }
+
+        // Apply on pointer down so the value is set before Continue is pressed.
+        event.preventDefault();
+        handleActivate();
+      }}
       className={`flex cursor-pointer gap-3 rounded-lg border p-4 transition-colors ${
         checked
           ? "border-emerald-600 bg-emerald-50"
@@ -99,8 +121,10 @@ export function ToggleField({
       <input
         type="checkbox"
         checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="mt-1 h-4 w-4 shrink-0 rounded accent-emerald-600"
+        readOnly
+        tabIndex={-1}
+        aria-hidden
+        className="pointer-events-none mt-1 h-4 w-4 shrink-0 rounded accent-emerald-600"
       />
       <span>
         <span className="block font-medium text-slate-900">{label}</span>
@@ -115,9 +139,12 @@ export function ToggleField({
 type ButtonProps = {
   children: ReactNode;
   onClick?: () => void;
+  onPointerDown?: (event: React.PointerEvent<HTMLButtonElement>) => void;
   type?: "button" | "submit";
   variant?: "primary" | "secondary";
   disabled?: boolean;
+  className?: string;
+  "aria-disabled"?: boolean;
 };
 
 type DateFieldProps = {
@@ -165,9 +192,12 @@ export function DateField({
 export function Button({
   children,
   onClick,
+  onPointerDown,
   type = "button",
   variant = "primary",
   disabled = false,
+  className = "",
+  "aria-disabled": ariaDisabled,
 }: ButtonProps) {
   const base =
     "inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50";
@@ -180,8 +210,10 @@ export function Button({
     <button
       type={type}
       onClick={onClick}
+      onPointerDown={onPointerDown}
       disabled={disabled}
-      className={`${base} ${styles}`}
+      aria-disabled={ariaDisabled}
+      className={`${base} ${styles} ${className}`.trim()}
     >
       {children}
     </button>

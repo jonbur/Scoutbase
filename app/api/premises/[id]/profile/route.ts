@@ -3,7 +3,7 @@ import type { BuildingAgeBand, FloodRiskZone, OwnershipType } from "@prisma/clie
 import { requireAuthContext } from "@/lib/auth";
 import { getPremisesForOrganisation } from "@/lib/premises";
 import { prisma } from "@/lib/prisma";
-import { computeApplicableSections } from "@/lib/sections";
+import { computeApplicableSections, getTemplateSectionsForProfile } from "@/lib/sections";
 import { EMPTY_PROFILE_FORM, type ProfileFormData } from "@/lib/profile-labels";
 
 type RouteParams = { params: { id: string } };
@@ -141,17 +141,20 @@ export async function PUT(request: Request, { params }: RouteParams) {
       );
     }
 
-    const applicableSections = computeApplicableSections({
-      buildingAgeBand: form.buildingAgeBand as BuildingAgeBand,
-      hasGas: form.hasGas,
-      hasSleeping: form.hasSleeping,
-      hasCateringKitchen: form.hasCateringKitchen,
-      hasGrounds: form.hasGrounds,
-      hasVehicles: form.hasVehicles,
-      hasPlantMachinery: form.hasPlantMachinery,
-      hasThirdPartyUsers: form.hasThirdPartyUsers,
-      floodRiskZone: form.floodRiskZone as FloodRiskZone | null,
-    });
+    const applicableSections = computeApplicableSections(
+      {
+        buildingAgeBand: form.buildingAgeBand as BuildingAgeBand,
+        hasGas: form.hasGas,
+        hasSleeping: form.hasSleeping,
+        hasCateringKitchen: form.hasCateringKitchen,
+        hasGrounds: form.hasGrounds,
+        hasVehicles: form.hasVehicles,
+        hasPlantMachinery: form.hasPlantMachinery,
+        hasThirdPartyUsers: form.hasThirdPartyUsers,
+        floodRiskZone: form.floodRiskZone as FloodRiskZone | null,
+      },
+      await getTemplateSectionsForProfile(),
+    );
 
     const profile = await prisma.premisesProfile.upsert({
       where: { premisesId: premises.id },

@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { AuditStatus } from "@prisma/client";
-import { AuditStartPanel } from "@/components/audit/AuditStartPanel";
+import { AuditsManager } from "@/components/audit/AuditsManager";
+import { PremisesPageHeader } from "@/components/premises/PremisesPageHeader";
 import { requireAuthContext } from "@/lib/auth";
 import { getPremisesForOrganisation } from "@/lib/premises";
 import { prisma } from "@/lib/prisma";
@@ -28,21 +29,30 @@ export default async function PremisesAuditPage({ params }: PageProps) {
       premisesId: premises.id,
       status: AuditStatus.DRAFT,
     },
-    select: { id: true },
+    select: { id: true, auditDate: true },
   });
 
   return (
     <div>
-      <p className="text-sm font-medium text-emerald-700">Annual safety audit</p>
-      <h1 className="mt-1 text-2xl font-semibold text-slate-900">{premises.name}</h1>
-      <p className="mt-1 text-slate-600">{premises.address}</p>
+      <PremisesPageHeader
+        premisesId={premises.id}
+        premisesName={premises.name}
+        address={premises.address}
+        eyebrow="Audits"
+        description="View past audits, start a new one against a chosen template, or continue a draft."
+      />
 
       <div className="mt-8">
-        <AuditStartPanel
+        <AuditsManager
           premisesId={premises.id}
           premisesName={premises.name}
           hasProfile={Boolean(premises.profile)}
           draftAuditId={draft?.id ?? null}
+          draftAuditDate={
+            draft?.auditDate
+              ? draft.auditDate.toISOString().slice(0, 10)
+              : null
+          }
         />
       </div>
     </div>

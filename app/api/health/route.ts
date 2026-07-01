@@ -5,7 +5,8 @@ export async function GET() {
   try {
     const template = await prisma.auditTemplate.findFirst({
       where: { isActive: true },
-      select: { version: true, publishedAt: true, sections: true },
+      orderBy: [{ publishedAt: "desc" }, { revision: "desc" }],
+      select: { version: true, revision: true, publishedAt: true, sections: true },
     });
 
     const sections = Array.isArray(template?.sections)
@@ -17,7 +18,11 @@ export async function GET() {
         status: "ok",
         database: "connected",
         auditTemplate: template
-          ? { version: template.version, sections }
+          ? {
+              version: template.version,
+              revision: template.revision,
+              sections,
+            }
           : null,
       },
       error: null,

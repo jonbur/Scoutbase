@@ -23,6 +23,14 @@ type AuditWizardProps = {
   initialSectionId: string;
 };
 
+function formatDisplayDate(value: string): string {
+  return new Date(`${value}T00:00:00`).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 type ActionDialogState = {
   item: AuditItemWithResponse;
   existingAction: AuditLinkedAction | null;
@@ -125,7 +133,14 @@ export function AuditWizard({
   const [actionDialog, setActionDialog] = useState<ActionDialogState | null>(null);
   const [savingAction, setSavingAction] = useState(false);
   const [deletingActionId, setDeletingActionId] = useState<string | null>(null);
+  const [completingAudit, setCompletingAudit] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isReadOnly = overview.status === "COMPLETE";
+  const canCompleteAudit =
+    !isReadOnly &&
+    overview.progress.completedSections === overview.progress.totalSections &&
+    overview.progress.totalSections > 0;
 
   const refreshOverview = useCallback(async () => {
     const response = await fetch(`/api/audit/${auditId}`);
@@ -341,6 +356,34 @@ export function AuditWizard({
     }
   }
 
+  async function handleCompleteAudit() {
+    setCompletingAudit(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/audit/${auditId}`, {
+        method: "POST",
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error ?? "Failed to complete audit");
+      }
+
+      setOverview(result.data);
+      router.push(`/premises/${premisesId}/audit`);
+      router.refresh();
+    } catch (completeError) {
+      setError(
+        completeError instanceof Error
+          ? completeError.message
+          : "Failed to complete audit",
+      );
+    } finally {
+      setCompletingAudit(false);
+    }
+  }
+
   const activeSection = overview.sections.find(
     (section) => section.id === activeSectionId,
   );
@@ -359,16 +402,29 @@ export function AuditWizard({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm text-slate-500">
-              Template {overview.templateVersion} · Draft audit
+              Audit {formatDisplayDate(overview.auditDate)} · Template{" "}
+              {overview.templateLabel} · {isReadOnly ? "Completed" : "Draft"}
             </p>
             <h1 className="text-xl font-semibold text-slate-900">
               {overview.premises.name}
             </h1>
           </div>
-          <p className="text-sm text-slate-600">
-            {overview.progress.completedSections} of{" "}
-            {overview.progress.totalSections} sections complete
-          </p>
+          <div className="flex flex-col items-end gap-2">
+            <p className="text-sm text-slate-600">
+              {overview.progress.completedSections} of{" "}
+              {overview.progress.totalSections} sections complete
+            </p>
+            {canCompleteAudit ? (
+              <button
+                type="button"
+                onClick={handleCompleteAudit}
+                disabled={completingAudit}
+                className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
+              >
+                {completingAudit ? "Finishing…" : "Finish audit"}
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -395,6 +451,13 @@ export function AuditWizard({
                 Answer each question below. Your responses are saved automatically.
               </p>
             </header>
+          ) : null}
+
+          {isReadOnly ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              This audit is complete and read-only. Answers are frozen against
+              template {overview.templateLabel}.
+            </div>
           ) : null}
 
           {error ? (

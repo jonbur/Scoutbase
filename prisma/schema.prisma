@@ -72,28 +72,40 @@ model PremisesProfile {
 }
 
 model AuditTemplate {
-  id          String   @id @default(cuid())
-  version     String   @unique
-  publishedAt DateTime
-  sections    Json
-  isActive    Boolean  @default(false)
-  audits      Audit[]
+  id           String                  @id @default(cuid())
+  version      String
+  revision     Int                     @default(1)
+  changeType   AuditTemplateChangeType @default(RELEASE)
+  description  String?
+  publishedAt  DateTime
+  sections     Json
+  isActive     Boolean                 @default(false)
+  supersededAt DateTime?
+  audits       Audit[]
+
+  @@unique([version, revision])
+  @@index([isActive])
+  @@index([version])
 }
 
 model Audit {
-  id          String          @id @default(cuid())
-  premisesId  String
-  premises    Premises        @relation(fields: [premisesId], references: [id], onDelete: Cascade)
-  templateId  String
-  template    AuditTemplate   @relation(fields: [templateId], references: [id])
-  status      AuditStatus
-  startedBy   String
-  startedAt   DateTime        @default(now())
-  completedAt DateTime?
-  responses   AuditResponse[]
-  sections    AuditSection[]
+  id               String          @id @default(cuid())
+  premisesId       String
+  premises         Premises        @relation(fields: [premisesId], references: [id], onDelete: Cascade)
+  templateId       String
+  template         AuditTemplate   @relation(fields: [templateId], references: [id])
+  templateRevision Int
+  auditDate        DateTime        @db.Date
+  sectionsSnapshot Json?
+  status           AuditStatus
+  startedBy        String
+  startedAt        DateTime        @default(now())
+  completedAt      DateTime?
+  responses        AuditResponse[]
+  sections         AuditSection[]
 
   @@index([premisesId])
+  @@index([premisesId, auditDate])
   @@index([templateId])
 }
 
@@ -246,6 +258,11 @@ enum FloodRiskZone {
   LOW
   MEDIUM
   HIGH
+}
+
+enum AuditTemplateChangeType {
+  RELEASE
+  PATCH
 }
 
 enum AuditStatus {
