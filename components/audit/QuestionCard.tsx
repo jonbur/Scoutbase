@@ -18,9 +18,14 @@ export type QuestionSavePayload = {
 
 type QuestionCardProps = {
   item: AuditItemWithResponse;
+  sectionId: string;
   saving: boolean;
   variant?: "default" | "sub";
-  onSave: (itemId: string, payload: QuestionSavePayload) => Promise<void>;
+  onSave: (
+    itemId: string,
+    sectionId: string,
+    payload: QuestionSavePayload,
+  ) => Promise<void>;
   onRaiseAction: (item: AuditItemWithResponse) => void;
   hasAction: boolean;
 };
@@ -87,6 +92,7 @@ function storedResponseKey(item: AuditItemWithResponse): string {
 
 export function QuestionCard({
   item,
+  sectionId,
   saving,
   variant = "default",
   onSave,
@@ -155,10 +161,10 @@ export function QuestionCard({
       }
 
       if (payload && canSave(currentItem, payload) === null) {
-        void onSaveRef.current(currentItem.id, payload);
+        void onSaveRef.current(currentItem.id, sectionId, payload);
       }
     };
-  }, [item.id]);
+  }, [item.id, sectionId]);
 
   const showNeedsAction = !isTextQuestion && (response === "YES" || response === "NO");
   const showYesDetails = !isTextQuestion && response === "YES";
@@ -171,7 +177,7 @@ export function QuestionCard({
     }
 
     setValidationError(null);
-    await onSave(item.id, next);
+    await onSave(item.id, sectionId, next);
   }
 
   function scheduleSave(next: QuestionSavePayload) {

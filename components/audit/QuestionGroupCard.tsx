@@ -10,9 +10,14 @@ import type {
 
 type QuestionGroupCardProps = {
   group: AuditGroupSectionItem;
+  sectionId: string;
   savingItemId: string | null;
   actionItemIds: string[];
-  onSave: (itemId: string, payload: QuestionSavePayload) => Promise<void>;
+  onSave: (
+    itemId: string,
+    sectionId: string,
+    payload: QuestionSavePayload,
+  ) => Promise<void>;
   onRaiseAction: (item: AuditItemWithResponse) => void;
 };
 
@@ -33,6 +38,7 @@ function toQuestionItem(
 
 export function QuestionGroupCard({
   group,
+  sectionId,
   savingItemId,
   actionItemIds,
   onSave,
@@ -57,6 +63,7 @@ export function QuestionGroupCard({
           <QuestionCard
             key={item.id}
             item={item}
+            sectionId={sectionId}
             variant="sub"
             saving={savingItemId === item.id}
             hasAction={actionItemIds.includes(item.id)}

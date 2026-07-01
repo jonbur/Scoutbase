@@ -3,6 +3,7 @@ import type {
   AnswerableAuditItem,
   AuditSubQuestion,
   AuditTemplateItem,
+  AuditTemplateSections,
 } from "@/types/audit-template";
 import { isGroupItem, isTextAnswerItem } from "@/types/audit-template";
 
@@ -127,6 +128,40 @@ export function findAnswerableItem(
   itemId: string,
 ): AnswerableAuditItem | undefined {
   return getAnswerableItems(items).find((item) => item.id === itemId);
+}
+
+export function findAnswerableItemInAudit(
+  templateSections: AuditTemplateSections,
+  profile: ProfileForSections,
+  itemId: string,
+  preferredSectionId?: string,
+): { item: AnswerableAuditItem; sectionId: string } | undefined {
+  const orderedSectionIds = preferredSectionId
+    ? [
+        preferredSectionId,
+        ...templateSections
+          .map((section) => section.id)
+          .filter((id) => id !== preferredSectionId),
+      ]
+    : templateSections.map((section) => section.id);
+
+  for (const sectionId of orderedSectionIds) {
+    const section = templateSections.find((entry) => entry.id === sectionId);
+    if (!section) {
+      continue;
+    }
+
+    const item = findAnswerableItem(
+      filterApplicableItems(section.items, profile),
+      itemId,
+    );
+
+    if (item) {
+      return { item, sectionId };
+    }
+  }
+
+  return undefined;
 }
 
 export function isTextResponseComplete(

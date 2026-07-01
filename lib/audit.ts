@@ -14,7 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { getPremisesForOrganisation } from "@/lib/premises";
 import {
   filterApplicableItems,
-  findAnswerableItem,
+  findAnswerableItemInAudit,
   getAnswerableItems,
   isTextResponseComplete,
 } from "@/lib/audit-items";
@@ -404,8 +404,14 @@ export async function saveAuditResponse(
     throw new Error("Section not found");
   }
 
-  const applicableItems = getApplicableItemsForSection(section, profile);
-  const item = findAnswerableItem(applicableItems, itemId);
+  const located = findAnswerableItemInAudit(
+    templateSections,
+    profile,
+    itemId,
+    sectionId,
+  );
+  const item = located?.item;
+  const resolvedSectionId = located?.sectionId ?? sectionId;
 
   if (!item) {
     throw new Error("Question not found in this section");
@@ -454,7 +460,7 @@ export async function saveAuditResponse(
 
   const sectionStatus = await refreshSectionStatus(
     auditId,
-    sectionId,
+    resolvedSectionId,
     profile,
     templateSections,
   );

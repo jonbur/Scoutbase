@@ -118,6 +118,7 @@ export function AuditWizard({
   }, [activeSectionId, loadSection]);
 
   function handleSectionSelect(sectionId: string) {
+    setError(null);
     setActiveSectionId(sectionId);
     router.replace(
       `/premises/${premisesId}/audit/${auditId}?section=${sectionId}`,
@@ -127,6 +128,7 @@ export function AuditWizard({
 
   async function saveQuestion(
     itemId: string,
+    sectionId: string,
     payload: QuestionSavePayload,
   ) {
     setSavingItemId(itemId);
@@ -138,7 +140,7 @@ export function AuditWizard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           itemId,
-          sectionId: activeSectionId,
+          sectionId,
           response: payload.response,
           notes: payload.notes || null,
           needsAction: payload.needsAction,
@@ -207,7 +209,7 @@ export function AuditWizard({
           priority: input.priority,
           dueDate: input.dueDate || null,
           itemId: actionItem.id,
-          sectionId: activeSectionId,
+          sectionId: sectionData?.section.id ?? activeSectionId,
         }),
       });
 
@@ -291,11 +293,12 @@ export function AuditWizard({
                   <QuestionGroupCard
                     key={entry.id}
                     group={entry}
+                    sectionId={sectionData.section.id}
                     savingItemId={savingItemId}
                     actionItemIds={actionItemIds}
-                    onSave={async (itemId, payload) => {
+                    onSave={async (itemId, sectionId, payload) => {
                       try {
-                        await saveQuestion(itemId, payload);
+                        await saveQuestion(itemId, sectionId, payload);
                       } catch (saveError) {
                         setError(
                           saveError instanceof Error
@@ -311,11 +314,12 @@ export function AuditWizard({
                   <QuestionCard
                     key={entry.item.id}
                     item={entry.item}
+                    sectionId={sectionData.section.id}
                     saving={savingItemId === entry.item.id}
                     hasAction={actionItemIds.includes(entry.item.id)}
-                    onSave={async (itemId, payload) => {
+                    onSave={async (itemId, sectionId, payload) => {
                       try {
-                        await saveQuestion(itemId, payload);
+                        await saveQuestion(itemId, sectionId, payload);
                       } catch (saveError) {
                         setError(
                           saveError instanceof Error
