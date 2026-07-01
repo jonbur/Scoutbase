@@ -16,7 +16,7 @@ import {
   type ProfileFormData,
 } from "@/lib/profile-labels";
 import { computeApplicableSections } from "@/lib/sections";
-import { auditTemplate202509 } from "@/prisma/data/audit-template-2025-09";
+import { auditTemplate202509 } from "@/prisma/data/audit-template-normalized";
 
 type ProfileWizardProps = {
   premisesId: string;

@@ -1,58 +1,69 @@
-import type { PremisesProfile } from "@prisma/client";
+import type { BuildingAgeBand, FloodRiskZone } from "@prisma/client";
 import type { AuditTemplateItem } from "@/types/audit-template";
+import { isTextAnswerItem } from "@/types/audit-template";
+
+export type ProfileForSections = {
+  buildingAgeBand: BuildingAgeBand;
+  hasGas: boolean;
+  hasSleeping: boolean;
+  hasCateringKitchen: boolean;
+  hasGrounds: boolean;
+  hasVehicles: boolean;
+  hasPlantMachinery: boolean;
+  hasThirdPartyUsers: boolean;
+  floodRiskZone: FloodRiskZone | null;
+};
+
+export function matchesProfileFlag(
+  flag: string,
+  profile: ProfileForSections,
+): boolean {
+  switch (flag) {
+    case "hasGas":
+      return profile.hasGas;
+    case "hasSleeping":
+      return profile.hasSleeping;
+    case "hasCateringKitchen":
+      return profile.hasCateringKitchen;
+    case "hasGrounds":
+      return profile.hasGrounds;
+    case "hasVehicles":
+      return profile.hasVehicles;
+    case "hasPlantMachinery":
+      return profile.hasPlantMachinery;
+    case "hasThirdPartyUsers":
+      return profile.hasThirdPartyUsers;
+    case "hasPaidStaff":
+      return false;
+    case "floodRisk":
+      return (
+        profile.floodRiskZone === "MEDIUM" || profile.floodRiskZone === "HIGH"
+      );
+    default:
+      return true;
+  }
+}
 
 export function isAuditItemApplicable(
   item: AuditTemplateItem,
-  profile: PremisesProfile,
+  profile: ProfileForSections,
 ): boolean {
-  for (const tag of item.tags) {
-    if (!tag.startsWith("profile:")) {
-      continue;
-    }
-
-    const flag = tag.slice("profile:".length);
-
-    switch (flag) {
-      case "hasGas":
-        if (!profile.hasGas) return false;
-        break;
-      case "hasSleeping":
-        if (!profile.hasSleeping) return false;
-        break;
-      case "hasCateringKitchen":
-        if (!profile.hasCateringKitchen) return false;
-        break;
-      case "hasGrounds":
-        if (!profile.hasGrounds) return false;
-        break;
-      case "hasVehicles":
-        if (!profile.hasVehicles) return false;
-        break;
-      case "hasPlantMachinery":
-        if (!profile.hasPlantMachinery) return false;
-        break;
-      case "hasThirdPartyUsers":
-        if (!profile.hasThirdPartyUsers) return false;
-        break;
-      case "buildingAgeBand":
-        if (profile.buildingAgeBand === "POST_2000") return false;
-        break;
-      case "floodRiskZone":
-        if (!profile.floodRiskZone || profile.floodRiskZone === "LOW") {
-          return false;
-        }
-        break;
-      default:
-        break;
-    }
+  if (!item.profileFlag) {
+    return true;
   }
-
-  return true;
+  return matchesProfileFlag(item.profileFlag, profile);
 }
 
 export function filterApplicableItems(
   items: AuditTemplateItem[],
-  profile: PremisesProfile,
+  profile: ProfileForSections,
 ): AuditTemplateItem[] {
   return items.filter((item) => isAuditItemApplicable(item, profile));
+}
+
+export function isTextResponseComplete(
+  item: AuditTemplateItem,
+  notes: string | null | undefined,
+): boolean {
+  return isTextAnswerItem(item) && Boolean(notes?.trim());
 }

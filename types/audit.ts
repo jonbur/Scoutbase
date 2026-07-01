@@ -29,8 +29,10 @@ export type AuditItemWithResponse = {
   id: string;
   question: string;
   guidance: string;
-  responseType: "yes_no_na" | "yes_no_na_action";
-  tags: string[];
+  responseType: "YES_NO_NA_ACTION" | "OPEN_TEXT" | "DATE_UPLOAD";
+  requiresDocument: boolean;
+  documentType?: string;
+  profileFlag?: string;
   response: {
     id: string;
     response: ResponseValue;

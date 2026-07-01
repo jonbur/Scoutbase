@@ -12,12 +12,13 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getPremisesForOrganisation } from "@/lib/premises";
-import { filterApplicableItems } from "@/lib/audit-items";
+import { filterApplicableItems, isTextResponseComplete } from "@/lib/audit-items";
 import type {
   AuditTemplateItem,
   AuditTemplateSection,
   AuditTemplateSections,
 } from "@/types/audit-template";
+import { isTextAnswerItem } from "@/types/audit-template";
 
 export type AuditWithRelations = Audit & {
   sections: AuditSection[];
@@ -159,7 +160,14 @@ export async function startOrResumeAudit(
   };
 }
 
-function isResponseComplete(response: AuditResponse): boolean {
+function isResponseComplete(
+  response: AuditResponse,
+  item?: AuditTemplateItem,
+): boolean {
+  if (item && isTextAnswerItem(item)) {
+    return isTextResponseComplete(item, response.notes);
+  }
+
   if (response.response === ResponseValue.YES) {
     return Boolean(response.notes?.trim());
   }
@@ -170,6 +178,17 @@ function isResponseComplete(response: AuditResponse): boolean {
     return true;
   }
   return response.response === ResponseValue.ACTION_NEEDED;
+}
+
+function countCompleteResponses(
+  responses: AuditResponse[],
+  items: AuditTemplateItem[],
+): number {
+  const itemsById = new Map(items.map((item) => [item.id, item]));
+  return responses.filter((response) => {
+    const item = itemsById.get(response.itemId);
+    return item ? isResponseComplete(response, item) : false;
+  }).length;
 }
 
 async function refreshSectionStatus(
@@ -200,7 +219,7 @@ async function refreshSectionStatus(
     },
   });
 
-  const answeredCount = responses.filter(isResponseComplete).length;
+  const answeredCount = countCompleteResponses(responses, applicableItems);
   let status: AuditSectionStatus;
 
   if (answeredCount === 0) {
@@ -263,14 +282,23 @@ export async function saveAuditResponse(
     throw new Error("Question not found in this section");
   }
 
-  const needsAction = options?.needsAction ?? false;
-  const notes = options?.notes ?? null;
+  let needsAction = options?.needsAction ?? false;
+  let notes = options?.notes ?? null;
+  let storedResponse = response;
 
-  if (response === ResponseValue.YES && !notes?.trim()) {
+  if (isTextAnswerItem(item)) {
+    if (!notes?.trim()) {
+      throw new Error("An answer is required");
+    }
+    storedResponse = ResponseValue.NA;
+    needsAction = false;
+  } else if (storedResponse === ResponseValue.YES && !notes?.trim()) {
     throw new Error("Provide details is required when answering Yes");
-  }
-
-  if (needsAction && response !== ResponseValue.YES && response !== ResponseValue.NO) {
+  } else if (
+    needsAction &&
+    storedResponse !== ResponseValue.YES &&
+    storedResponse !== ResponseValue.NO
+  ) {
     throw new Error("Needs action can only be set for Yes or No answers");
   }
 
@@ -281,13 +309,13 @@ export async function saveAuditResponse(
     create: {
       auditId,
       itemId,
-      response,
+      response: storedResponse,
       needsAction,
       notes: notes?.trim() ? notes.trim() : null,
       respondedBy: userId,
     },
     update: {
-      response,
+      response: storedResponse,
       needsAction,
       notes: notes?.trim() ? notes.trim() : null,
       respondedBy: userId,
@@ -438,10 +466,12 @@ export function buildAuditOverview(audit: AuditWithRelations) {
       );
       const itemCount = applicableItems.length;
       const applicableIds = new Set(applicableItems.map((item) => item.id));
-      const answeredCount = audit.responses.filter(
-        (response) =>
-          applicableIds.has(response.itemId) && isResponseComplete(response),
-      ).length;
+      const answeredCount = countCompleteResponses(
+        audit.responses.filter((response) =>
+          applicableIds.has(response.itemId),
+        ),
+        applicableItems,
+      );
 
       return {
         id: sectionRecord.sectionId,

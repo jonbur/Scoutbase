@@ -8,7 +8,7 @@ export type {
 } from "./audit";
 export { RESPONSE_LABELS, SECTION_STATUS_LABELS } from "./audit";
 
-export type { ProfileForSections } from "@/lib/sections";
+export type { ProfileForSections } from "@/lib/audit-items";
 
 export {
   OrgType,

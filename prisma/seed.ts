@@ -1,7 +1,10 @@
 import { OrgType, Role, PrismaClient, OwnershipType, BuildingAgeBand, FloodRiskZone } from "@prisma/client";
 import { DEV_USER_ID } from "../lib/auth";
 import { computeApplicableSections } from "../lib/sections";
-import { auditTemplate202509 } from "./data/audit-template-2025-09";
+import {
+  auditTemplate202509,
+  AUDIT_TEMPLATE_PUBLISHED_AT,
+} from "./data/audit-template-normalized";
 
 const prisma = new PrismaClient();
 
@@ -15,12 +18,12 @@ async function main() {
     where: { version: "2025-09" },
     update: {
       sections: auditTemplate202509,
-      publishedAt: new Date("2025-09-01T00:00:00.000Z"),
+      publishedAt: AUDIT_TEMPLATE_PUBLISHED_AT,
       isActive: true,
     },
     create: {
       version: "2025-09",
-      publishedAt: new Date("2025-09-01T00:00:00.000Z"),
+      publishedAt: AUDIT_TEMPLATE_PUBLISHED_AT,
       sections: auditTemplate202509,
       isActive: true,
     },
