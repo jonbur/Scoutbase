@@ -28,7 +28,7 @@ export default async function PremisesAuditPage({ params }: PageProps) {
       premisesId: premises.id,
       status: AuditStatus.DRAFT,
     },
-    select: { id: true },
+    select: { id: true, auditYear: true },
   });
 
   return (
@@ -43,6 +43,7 @@ export default async function PremisesAuditPage({ params }: PageProps) {
           premisesName={premises.name}
           hasProfile={Boolean(premises.profile)}
           draftAuditId={draft?.id ?? null}
+          draftAuditYear={draft?.auditYear ?? null}
         />
       </div>
     </div>

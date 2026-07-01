@@ -4,6 +4,7 @@ import { computeApplicableSections } from "../lib/sections";
 import {
   auditTemplate202509,
   AUDIT_TEMPLATE_PUBLISHED_AT,
+  AUDIT_TEMPLATE_VERSION,
 } from "./data/audit-template-normalized";
 
 const prisma = new PrismaClient();
@@ -15,21 +16,33 @@ async function main() {
   console.log("Seeding database...");
 
   const template = await prisma.auditTemplate.upsert({
-    where: { version: "2025-09" },
+    where: {
+      version_revision: {
+        version: AUDIT_TEMPLATE_VERSION,
+        revision: 1,
+      },
+    },
     update: {
       sections: auditTemplate202509,
       publishedAt: AUDIT_TEMPLATE_PUBLISHED_AT,
       isActive: true,
+      changeType: "RELEASE",
+      description: "Scout Association premises audit — September 2025 release",
     },
     create: {
-      version: "2025-09",
+      version: AUDIT_TEMPLATE_VERSION,
+      revision: 1,
+      changeType: "RELEASE",
+      description: "Scout Association premises audit — September 2025 release",
       publishedAt: AUDIT_TEMPLATE_PUBLISHED_AT,
       sections: auditTemplate202509,
       isActive: true,
     },
   });
 
-  console.log(`Audit template seeded: ${template.version} (${template.id})`);
+  console.log(
+    `Audit template seeded: ${template.version} rev ${template.revision} (${template.id})`,
+  );
   console.log(
     `  Sections: ${auditTemplate202509.length}, Top-level items: ${auditTemplate202509.reduce((n, s) => n + s.items.length, 0)}, Answerable questions: ${auditTemplate202509.reduce((n, s) => n + s.items.reduce((count, item) => count + (item.responseType === "GROUP" ? item.subQuestions.length : 1), 0), 0)}`,
   );

@@ -103,26 +103,39 @@ model PremisesProfile {
 }
 
 model AuditTemplate {
-  id          String    @id @default(cuid())
-  version     String    // e.g. "2025-09"
-  publishedAt DateTime
-  sections    Json      // Array of { id, number, title, items: [{id, question, guidance, responseType, tags}] }
-  isActive    Boolean   @default(false)
-  audits      Audit[]
+  id           String                  @id @default(cuid())
+  version      String                  // e.g. "2025-09" — annual/questionnaire release
+  revision     Int                     @default(1) // patch within a release
+  changeType   AuditTemplateChangeType @default(RELEASE) // RELEASE | PATCH
+  description  String?
+  publishedAt  DateTime
+  sections     Json                    // Array of sections/items
+  isActive     Boolean                 @default(false) // template used for new audits
+  supersededAt DateTime?
+  audits       Audit[]
+
+  @@unique([version, revision])
 }
 
+// Each premises may have multiple audits over time (typically one per year).
+// Draft audits follow the latest revision of the active template.
+// Completed audits store a sectionsSnapshot so template patches do not rewrite history.
+
 model Audit {
-  id          String        @id @default(cuid())
-  premisesId  String
-  premises    Premises      @relation(fields: [premisesId], references: [id])
-  templateId  String
-  template    AuditTemplate @relation(fields: [templateId], references: [id])
-  status      AuditStatus   // DRAFT | COMPLETE
-  startedBy   String        // userId
-  startedAt   DateTime      @default(now())
-  completedAt DateTime?
-  responses   AuditResponse[]
-  sections    AuditSection[]
+  id               String        @id @default(cuid())
+  premisesId       String
+  premises         Premises      @relation(fields: [premisesId], references: [id])
+  templateId       String
+  template         AuditTemplate @relation(fields: [templateId], references: [id])
+  templateRevision Int           // pinned at start; updated for drafts on template sync
+  auditYear        Int           // compliance year, e.g. 2025
+  sectionsSnapshot Json?         // frozen template JSON when status becomes COMPLETE
+  status           AuditStatus   // DRAFT | COMPLETE
+  startedBy        String        // userId
+  startedAt        DateTime      @default(now())
+  completedAt      DateTime?
+  responses        AuditResponse[]
+  sections         AuditSection[]
 }
 
 model AuditSection {

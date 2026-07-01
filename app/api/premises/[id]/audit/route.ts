@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
 import { AuditStatus } from "@prisma/client";
 import { requireAuthContext } from "@/lib/auth";
-import { buildAuditOverview, startOrResumeAudit } from "@/lib/audit";
+import {
+  buildAuditOverview,
+  listPremisesAudits,
+  startNewAnnualAudit,
+  startOrResumeAudit,
+} from "@/lib/audit";
+import {
+  currentAuditYear,
+  getActiveAuditTemplateSummary,
+} from "@/lib/audit-templates";
 import { getPremisesForOrganisation } from "@/lib/premises";
 import { prisma } from "@/lib/prisma";
 
@@ -22,18 +31,30 @@ export async function GET(_request: Request, { params }: RouteParams) {
       );
     }
 
-    const draft = await prisma.audit.findFirst({
-      where: {
-        premisesId: params.id,
-        status: AuditStatus.DRAFT,
-      },
-      select: { id: true, startedAt: true },
-    });
+    const [draft, audits, activeTemplate] = await Promise.all([
+      prisma.audit.findFirst({
+        where: {
+          premisesId: params.id,
+          status: AuditStatus.DRAFT,
+        },
+        select: { id: true, startedAt: true, auditYear: true },
+      }),
+      listPremisesAudits(params.id, auth.organisationId),
+      getActiveAuditTemplateSummary(),
+    ]);
+
+    const currentYear = currentAuditYear();
+    const canStartNewAudit =
+      !draft && !audits.some((audit) => audit.auditYear === currentYear);
 
     return NextResponse.json({
       data: {
         hasProfile: Boolean(premises.profile),
         draftAudit: draft,
+        audits,
+        activeTemplate,
+        currentAuditYear: currentYear,
+        canStartNewAudit,
       },
       error: null,
     });
@@ -48,9 +69,40 @@ export async function GET(_request: Request, { params }: RouteParams) {
   }
 }
 
-export async function POST(_request: Request, { params }: RouteParams) {
+export async function POST(request: Request, { params }: RouteParams) {
   try {
     const auth = await requireAuthContext();
+    const body = await request.json().catch(() => ({}));
+    const action =
+      body && typeof body === "object" && "action" in body
+        ? String((body as { action?: string }).action)
+        : "resume";
+
+    if (action === "start") {
+      const auditYear =
+        body &&
+        typeof body === "object" &&
+        typeof (body as { auditYear?: unknown }).auditYear === "number"
+          ? (body as { auditYear: number }).auditYear
+          : currentAuditYear();
+
+      const { audit, created } = await startNewAnnualAudit(
+        params.id,
+        auth.organisationId,
+        auth.userId,
+        auditYear,
+      );
+
+      return NextResponse.json({
+        data: {
+          auditId: audit.id,
+          created,
+          overview: buildAuditOverview(audit),
+        },
+        error: null,
+      });
+    }
+
     const { audit, created } = await startOrResumeAudit(
       params.id,
       auth.organisationId,
@@ -72,7 +124,10 @@ export async function POST(_request: Request, { params }: RouteParams) {
         ? 401
         : message === "Premises not found"
           ? 404
-          : message.includes("profile") || message.includes("sections")
+          : message.includes("profile") ||
+              message.includes("sections") ||
+              message.includes("already exists") ||
+              message.includes("draft audit")
             ? 400
             : 500;
 

@@ -3,6 +3,7 @@ import {
   ActionStatus,
   AuditSectionStatus,
   AuditStatus,
+  AuditTemplateChangeType,
   Priority,
   ResponseValue,
   type Action,
@@ -13,6 +14,13 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getPremisesForOrganisation } from "@/lib/premises";
+import {
+  collectAnswerableItemIds,
+  currentAuditYear,
+  getActiveAuditTemplate,
+  getAuditTemplateSections,
+  parseTemplateSections,
+} from "@/lib/audit-templates";
 import {
   filterApplicableItems,
   findAnswerableItemInAudit,
@@ -33,7 +41,12 @@ import type { AuditLinkedAction } from "@/types/audit";
 export type AuditWithRelations = Audit & {
   sections: AuditSection[];
   responses: AuditResponse[];
-  template: { version: string; sections: unknown };
+  template: {
+    version: string;
+    revision: number;
+    changeType: AuditTemplateChangeType;
+    sections: unknown;
+  };
   premises: {
     id: string;
     name: string;
@@ -41,14 +54,32 @@ export type AuditWithRelations = Audit & {
   };
 };
 
-export function parseTemplateSections(sections: unknown): AuditTemplateSections {
-  return sections as AuditTemplateSections;
-}
+export type AuditListItem = {
+  id: string;
+  auditYear: number;
+  status: AuditStatus;
+  templateVersion: string;
+  templateRevision: number;
+  templateLabel: string;
+  startedAt: string;
+  completedAt: string | null;
+  progress: {
+    completedSections: number;
+    totalSections: number;
+  };
+};
 
 const auditWithRelationsInclude = {
   sections: { orderBy: { sectionId: "asc" as const } },
   responses: true,
-  template: { select: { version: true, sections: true } },
+  template: {
+    select: {
+      version: true,
+      revision: true,
+      changeType: true,
+      sections: true,
+    },
+  },
   premises: {
     select: {
       id: true,
@@ -82,6 +113,42 @@ function applicableSectionsMatch(
   return current.every((sectionId, index) => sectionId === target[index]);
 }
 
+function formatTemplateLabel(version: string, revision: number): string {
+  return revision <= 1 ? version : `${version} (rev ${revision})`;
+}
+
+async function pruneOrphanedResponses(
+  auditId: string,
+  templateSections: AuditTemplateSections,
+  profile: PremisesProfile,
+  applicableSectionIds: string[],
+): Promise<void> {
+  const validItemIds = new Set<string>();
+
+  for (const sectionId of applicableSectionIds) {
+    const section = getTemplateSection(templateSections, sectionId);
+    if (!section) {
+      continue;
+    }
+
+    const applicableItems = getApplicableItemsForSection(section, profile);
+    for (const item of getAnswerableItems(applicableItems)) {
+      validItemIds.add(item.id);
+    }
+  }
+
+  if (validItemIds.size === 0) {
+    return;
+  }
+
+  await prisma.auditResponse.deleteMany({
+    where: {
+      auditId,
+      itemId: { notIn: Array.from(validItemIds) },
+    },
+  });
+}
+
 export async function syncDraftAudit(
   audit: AuditWithRelations,
 ): Promise<AuditWithRelations> {
@@ -94,16 +161,13 @@ export async function syncDraftAudit(
     return audit;
   }
 
-  const activeTemplate = await prisma.auditTemplate.findFirst({
-    where: { isActive: true },
-    orderBy: { publishedAt: "desc" },
-  });
-
+  const activeTemplate = await getActiveAuditTemplate();
   if (!activeTemplate) {
     return audit;
   }
 
-  const applicableSections = computeApplicableSections(profile);
+  const activeSections = parseTemplateSections(activeTemplate.sections);
+  const applicableSections = computeApplicableSections(profile, activeSections);
   const currentSectionIds = new Set(
     audit.sections.map((section) => section.sectionId),
   );
@@ -139,7 +203,10 @@ export async function syncDraftAudit(
     if (needsTemplateUpdate) {
       await tx.audit.update({
         where: { id: audit.id },
-        data: { templateId: activeTemplate.id },
+        data: {
+          templateId: activeTemplate.id,
+          templateRevision: activeTemplate.revision,
+        },
       });
     }
 
@@ -162,6 +229,15 @@ export async function syncDraftAudit(
       });
     }
   });
+
+  if (needsTemplateUpdate || sectionsToRemove.length > 0) {
+    await pruneOrphanedResponses(
+      audit.id,
+      activeSections,
+      profile,
+      applicableSections,
+    );
+  }
 
   const refreshed = await prisma.audit.findUnique({
     where: { id: audit.id },
@@ -202,6 +278,41 @@ export function getApplicableItemsForSection(
   return filterApplicableItems(section.items, profile);
 }
 
+export async function listPremisesAudits(
+  premisesId: string,
+  organisationId: string,
+): Promise<AuditListItem[]> {
+  const premises = await getPremisesForOrganisation(premisesId, organisationId);
+
+  if (!premises) {
+    throw new Error("Premises not found");
+  }
+
+  const audits = await prisma.audit.findMany({
+    where: { premisesId },
+    include: auditWithRelationsInclude,
+    orderBy: [{ auditYear: "desc" }, { startedAt: "desc" }],
+  });
+
+  return audits.map((audit) => {
+    const overview = buildAuditOverview(audit as AuditWithRelations);
+    return {
+      id: audit.id,
+      auditYear: audit.auditYear,
+      status: audit.status,
+      templateVersion: audit.template.version,
+      templateRevision: audit.templateRevision,
+      templateLabel: formatTemplateLabel(
+        audit.template.version,
+        audit.templateRevision,
+      ),
+      startedAt: audit.startedAt.toISOString(),
+      completedAt: audit.completedAt?.toISOString() ?? null,
+      progress: overview.progress,
+    };
+  });
+}
+
 export async function startOrResumeAudit(
   premisesId: string,
   organisationId: string,
@@ -226,18 +337,7 @@ export async function startOrResumeAudit(
       premisesId,
       status: AuditStatus.DRAFT,
     },
-    include: {
-      sections: { orderBy: { sectionId: "asc" } },
-      responses: true,
-      template: { select: { version: true, sections: true } },
-      premises: {
-        select: {
-          id: true,
-          name: true,
-          profile: true,
-        },
-      },
-    },
+    include: auditWithRelationsInclude,
   });
 
   if (existingDraft) {
@@ -249,46 +349,116 @@ export async function startOrResumeAudit(
     };
   }
 
-  const template = await prisma.auditTemplate.findFirst({
-    where: { isActive: true },
-    orderBy: { publishedAt: "desc" },
+  return startNewAnnualAudit(premisesId, organisationId, userId);
+}
+
+export async function startNewAnnualAudit(
+  premisesId: string,
+  organisationId: string,
+  userId: string,
+  auditYear = currentAuditYear(),
+): Promise<{ audit: AuditWithRelations; created: boolean }> {
+  const premises = await getPremisesForOrganisation(premisesId, organisationId);
+
+  if (!premises) {
+    throw new Error("Premises not found");
+  }
+
+  if (!premises.profile) {
+    throw new Error("Complete the premises profile before starting an audit");
+  }
+
+  const existingDraft = await prisma.audit.findFirst({
+    where: { premisesId, status: AuditStatus.DRAFT },
+    select: { id: true },
   });
+
+  if (existingDraft) {
+    throw new Error("Finish or continue the draft audit before starting another");
+  }
+
+  const existingForYear = await prisma.audit.findFirst({
+    where: { premisesId, auditYear },
+    select: { id: true, status: true },
+  });
+
+  if (existingForYear) {
+    throw new Error(`An audit for ${auditYear} already exists`);
+  }
+
+  const template = await getActiveAuditTemplate();
 
   if (!template) {
     throw new Error("No active audit template found");
+  }
+
+  const templateSections = parseTemplateSections(template.sections);
+  const applicableSections = computeApplicableSections(
+    premises.profile,
+    templateSections,
+  );
+
+  if (applicableSections.length === 0) {
+    throw new Error("No audit sections apply to this premises profile");
   }
 
   const audit = await prisma.audit.create({
     data: {
       premisesId,
       templateId: template.id,
+      templateRevision: template.revision,
+      auditYear,
       status: AuditStatus.DRAFT,
       startedBy: userId,
       sections: {
-        create: premises.profile.applicableSections.map((sectionId) => ({
+        create: applicableSections.map((sectionId) => ({
           sectionId,
           status: AuditSectionStatus.NOT_STARTED,
         })),
       },
     },
-    include: {
-      sections: { orderBy: { sectionId: "asc" } },
-      responses: true,
-      template: { select: { version: true, sections: true } },
-      premises: {
-        select: {
-          id: true,
-          name: true,
-          profile: true,
-        },
-      },
-    },
+    include: auditWithRelationsInclude,
   });
 
   return {
     audit: audit as AuditWithRelations,
     created: true,
   };
+}
+
+export async function completeAudit(
+  auditId: string,
+  organisationId: string,
+): Promise<AuditWithRelations> {
+  const audit = await fetchAuditWithRelations(auditId, organisationId);
+
+  if (!audit) {
+    throw new Error("Audit not found");
+  }
+
+  if (audit.status !== AuditStatus.DRAFT) {
+    throw new Error("Only draft audits can be completed");
+  }
+
+  const overview = buildAuditOverview(audit);
+  if (overview.progress.completedSections < overview.progress.totalSections) {
+    throw new Error("Complete all sections before finishing the audit");
+  }
+
+  const templateSections = getAuditTemplateSections(audit);
+
+  const completed = await prisma.audit.update({
+    where: { id: auditId },
+    data: {
+      status: AuditStatus.COMPLETE,
+      completedAt: new Date(),
+      sectionsSnapshot: templateSections,
+      templateRevision: audit.template.revision,
+    },
+    include: auditWithRelationsInclude,
+  });
+
+  return completed as AuditWithRelations;
 }
 
 function isResponseComplete(
@@ -401,7 +571,7 @@ export async function saveAuditResponse(
     throw new Error("Premises profile is required");
   }
 
-  const templateSections = parseTemplateSections(audit.template.sections);
+  const templateSections = getAuditTemplateSections(audit);
   const section = getTemplateSection(templateSections, sectionId);
 
   if (!section) {
@@ -502,6 +672,11 @@ export async function createAuditAction(
 
   if (!audit) {
     throw new Error("Audit not found");
+  }
+
+  const templateSections = getAuditTemplateSections(audit);
+  if (!collectAnswerableItemIds(templateSections).has(input.itemId)) {
+    throw new Error("Question not found in this audit template");
   }
 
   return prisma.action.create({
@@ -621,7 +796,7 @@ export async function buildAuditSectionPayload(
     throw new Error("Premises profile is required");
   }
 
-  const templateSections = parseTemplateSections(audit.template.sections);
+  const templateSections = getAuditTemplateSections(audit);
   const section = getTemplateSection(templateSections, sectionId);
 
   if (!section) {
@@ -689,7 +864,7 @@ export async function buildAuditSectionPayload(
 }
 
 export function buildAuditOverview(audit: AuditWithRelations) {
-  const templateSections = parseTemplateSections(audit.template.sections);
+  const templateSections = getAuditTemplateSections(audit);
   const profile = audit.premises.profile;
 
   const sections = audit.sections
@@ -736,7 +911,13 @@ export function buildAuditOverview(audit: AuditWithRelations) {
   return {
     id: audit.id,
     status: audit.status,
+    auditYear: audit.auditYear,
     templateVersion: audit.template.version,
+    templateRevision: audit.templateRevision,
+    templateLabel: formatTemplateLabel(
+      audit.template.version,
+      audit.templateRevision,
+    ),
     premises: audit.premises,
     sections,
     progress: {
@@ -745,3 +926,5 @@ export function buildAuditOverview(audit: AuditWithRelations) {
     },
   };
 }
+
+export { parseTemplateSections } from "@/lib/audit-templates";

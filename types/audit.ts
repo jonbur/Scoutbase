@@ -22,13 +22,29 @@ export type AuditSectionSummary = {
 export type AuditOverview = {
   id: string;
   status: string;
+  auditYear: number;
   templateVersion: string;
+  templateRevision: number;
+  templateLabel: string;
   premises: {
     id: string;
     name: string;
     profile: unknown;
   };
   sections: AuditSectionSummary[];
+  progress: {
+    completedSections: number;
+    totalSections: number;
+  };
+};
+
+export type AuditHistoryItem = {
+  id: string;
+  auditYear: number;
+  status: string;
+  templateLabel: string;
+  startedAt: string;
+  completedAt: string | null;
   progress: {
     completedSections: number;
     totalSections: number;
