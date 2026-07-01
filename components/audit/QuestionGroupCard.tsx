@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import type { QuestionSavePayload } from "@/components/audit/QuestionCard";
 import { QuestionCard } from "@/components/audit/QuestionCard";
 import type {
@@ -37,6 +38,11 @@ export function QuestionGroupCard({
   onSave,
   onRaiseAction,
 }: QuestionGroupCardProps) {
+  const questionItems = useMemo(
+    () => group.subQuestions.map((subQuestion) => toQuestionItem(subQuestion)),
+    [group.subQuestions],
+  );
+
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <h3 className="text-base font-medium text-slate-900">{group.label}</h3>
@@ -47,13 +53,13 @@ export function QuestionGroupCard({
       ) : null}
 
       <div className="mt-4 space-y-4 border-l-2 border-emerald-100 pl-4">
-        {group.subQuestions.map((subQuestion) => (
+        {questionItems.map((item) => (
           <QuestionCard
-            key={subQuestion.id}
-            item={toQuestionItem(subQuestion)}
+            key={item.id}
+            item={item}
             variant="sub"
-            saving={savingItemId === subQuestion.id}
-            hasAction={actionItemIds.includes(subQuestion.id)}
+            saving={savingItemId === item.id}
+            hasAction={actionItemIds.includes(item.id)}
             onSave={onSave}
             onRaiseAction={onRaiseAction}
           />

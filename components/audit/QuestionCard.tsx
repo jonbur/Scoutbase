@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { ResponseValue } from "@prisma/client";
+import { useEffect, useRef, useState } from "react";
 import type { AuditItemWithResponse } from "@/types/audit";
 import {
   isPrimaryResponse,
@@ -73,6 +72,19 @@ function canSave(item: AuditItemWithResponse, payload: QuestionSavePayload): str
   return null;
 }
 
+function storedResponseKey(item: AuditItemWithResponse): string {
+  if (!item.response) {
+    return "none";
+  }
+
+  return [
+    item.response.id,
+    item.response.response,
+    item.response.needsAction,
+    item.response.notes ?? "",
+  ].join(":");
+}
+
 export function QuestionCard({
   item,
   saving,
@@ -89,8 +101,17 @@ export function QuestionCard({
   const [notes, setNotes] = useState(initial.notes);
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stateRef = useRef({ response: initial.response, needsAction: initial.needsAction, notes: initial.notes });
+  const onSaveRef = useRef(onSave);
+  const itemRef = useRef(item);
+
   const isTextQuestion = isTextAnswerItem(item);
   const isDateQuestion = isDateUploadItem(item);
+
+  stateRef.current = { response, needsAction, notes };
+  onSaveRef.current = onSave;
+  itemRef.current = item;
 
   useEffect(() => {
     const next = normalizeStoredResponse(item);
@@ -98,7 +119,43 @@ export function QuestionCard({
     setNeedsAction(next.needsAction);
     setNotes(next.notes);
     setValidationError(null);
-  }, [item]);
+  }, [item.id, storedResponseKey(item)]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+
+      const currentItem = itemRef.current;
+      const current = stateRef.current;
+      let payload: QuestionSavePayload | null = null;
+
+      if (isTextAnswerItem(currentItem)) {
+        if (current.notes.trim()) {
+          payload = { response: "NA", needsAction: false, notes: current.notes };
+        }
+      } else if (current.response === "YES" && current.notes.trim()) {
+        payload = {
+          response: "YES",
+          needsAction: current.needsAction,
+          notes: current.notes,
+        };
+      } else if (current.response === "NO") {
+        payload = {
+          response: "NO",
+          needsAction: current.needsAction,
+          notes: "",
+        };
+      } else if (current.response === "NA") {
+        payload = { response: "NA", needsAction: false, notes: "" };
+      }
+
+      if (payload && canSave(currentItem, payload) === null) {
+        void onSaveRef.current(currentItem.id, payload);
+      }
+    };
+  }, [item.id]);
 
   const showNeedsAction = !isTextQuestion && (response === "YES" || response === "NO");
   const showYesDetails = !isTextQuestion && response === "YES";
@@ -114,14 +171,26 @@ export function QuestionCard({
     await onSave(item.id, next);
   }
 
+  function scheduleSave(next: QuestionSavePayload) {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    if (canSave(item, next) !== null) {
+      return;
+    }
+
+    debounceRef.current = setTimeout(() => {
+      void persist(next);
+    }, 400);
+  }
+
   async function handleResponseChange(nextResponse: PrimaryResponseValue) {
-    const next: QuestionSavePayload = {
-      response: nextResponse,
-      needsAction: nextResponse === "NA" ? false : needsAction,
-      notes: nextResponse === "YES" ? notes : "",
-    };
+    const nextNotes = nextResponse === "YES" ? notes : "";
+    const nextNeedsAction = nextResponse === "NA" ? false : needsAction;
 
     setResponse(nextResponse);
+
     if (nextResponse === "NA") {
       setNeedsAction(false);
       setNotes("");
@@ -131,11 +200,19 @@ export function QuestionCard({
 
     if (nextResponse === "NO") {
       setNotes("");
-      await persist({ response: "NO", needsAction: next.needsAction, notes: "" });
+      await persist({ response: "NO", needsAction: nextNeedsAction, notes: "" });
       return;
     }
 
     setValidationError(null);
+
+    if (nextNotes.trim()) {
+      await persist({
+        response: "YES",
+        needsAction: nextNeedsAction,
+        notes: nextNotes,
+      });
+    }
   }
 
   async function handleNeedsActionChange(checked: boolean) {
@@ -146,7 +223,25 @@ export function QuestionCard({
     await persist(next);
   }
 
+  function handleNotesChange(value: string) {
+    setNotes(value);
+
+    if (isTextQuestion) {
+      scheduleSave({ response: "NA", needsAction: false, notes: value });
+      return;
+    }
+
+    if (response === "YES") {
+      scheduleSave({ response: "YES", needsAction, notes: value });
+    }
+  }
+
   async function handleNotesBlur() {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+
     if (isTextQuestion) {
       await persist({ response: "NA", needsAction: false, notes });
       return;
@@ -201,7 +296,7 @@ export function QuestionCard({
             rows={3}
             value={notes}
             disabled={saving}
-            onChange={(event) => setNotes(event.target.value)}
+            onChange={(event) => handleNotesChange(event.target.value)}
             onBlur={handleNotesBlur}
             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:opacity-50"
             placeholder={
@@ -234,7 +329,7 @@ export function QuestionCard({
                 rows={3}
                 value={notes}
                 disabled={saving}
-                onChange={(event) => setNotes(event.target.value)}
+                onChange={(event) => handleNotesChange(event.target.value)}
                 onBlur={handleNotesBlur}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:opacity-50"
                 placeholder="Describe what is in place, any evidence, or context for your answer"
