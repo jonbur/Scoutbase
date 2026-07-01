@@ -205,8 +205,8 @@ export function AuditWizard({
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-        <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="grid gap-6 sm:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="sticky top-4 self-start max-h-[calc(100vh-6rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">Sections</h2>
           <SectionNav
             sections={overview.sections}
@@ -215,7 +215,7 @@ export function AuditWizard({
           />
         </aside>
 
-        <section className="space-y-4">
+        <section className="min-w-0 space-y-4">
           {activeSection ? (
             <header>
               <p className="text-sm text-slate-500">
