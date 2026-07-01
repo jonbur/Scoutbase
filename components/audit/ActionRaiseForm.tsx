@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Priority } from "@prisma/client";
-import type { AuditItemWithResponse } from "@/types/audit";
+import type { AuditItemWithResponse, AuditLinkedAction } from "@/types/audit";
 import { Button } from "@/components/ui/form";
 
 const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
@@ -11,8 +11,9 @@ const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
   { value: "LOW", label: "Low" },
 ];
 
-type ActionRaiseFormProps = {
+type ActionFormProps = {
   item: AuditItemWithResponse;
+  existingAction?: AuditLinkedAction | null;
   saving: boolean;
   onSubmit: (input: {
     title: string;
@@ -23,16 +24,23 @@ type ActionRaiseFormProps = {
   onCancel: () => void;
 };
 
-export function ActionRaiseForm({
+export function ActionForm({
   item,
+  existingAction = null,
   saving,
   onSubmit,
   onCancel,
-}: ActionRaiseFormProps) {
-  const [title, setTitle] = useState(item.question);
-  const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState<Priority>("MEDIUM");
-  const [dueDate, setDueDate] = useState("");
+}: ActionFormProps) {
+  const isEditing = Boolean(existingAction);
+
+  const [title, setTitle] = useState(existingAction?.title ?? item.question);
+  const [description, setDescription] = useState(
+    existingAction?.description ?? "",
+  );
+  const [priority, setPriority] = useState<Priority>(
+    existingAction?.priority ?? "MEDIUM",
+  );
+  const [dueDate, setDueDate] = useState(existingAction?.dueDate ?? "");
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent) {
@@ -55,7 +63,9 @@ export function ActionRaiseForm({
       setError(
         submitError instanceof Error
           ? submitError.message
-          : "Failed to raise action",
+          : isEditing
+            ? "Failed to update action"
+            : "Failed to raise action",
       );
     }
   }
@@ -66,9 +76,13 @@ export function ActionRaiseForm({
         onSubmit={handleSubmit}
         className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-xl"
       >
-        <h2 className="text-lg font-semibold text-slate-900">Raise action</h2>
+        <h2 className="text-lg font-semibold text-slate-900">
+          {isEditing ? "Edit action" : "Raise action"}
+        </h2>
         <p className="mt-1 text-sm text-slate-600">
-          Create a follow-up task from this audit question.
+          {isEditing
+            ? "Update the follow-up task linked to this audit question."
+            : "Create a follow-up task from this audit question."}
         </p>
 
         <div className="mt-4 space-y-4">
@@ -130,7 +144,7 @@ export function ActionRaiseForm({
               type="date"
               value={dueDate}
               onChange={(event) => setDueDate(event.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
         </div>
@@ -144,10 +158,17 @@ export function ActionRaiseForm({
             Cancel
           </Button>
           <Button type="submit" disabled={saving}>
-            {saving ? "Saving…" : "Create action"}
+            {saving
+              ? "Saving…"
+              : isEditing
+                ? "Save changes"
+                : "Create action"}
           </Button>
         </div>
       </form>
     </div>
   );
 }
+
+/** @deprecated Use ActionForm */
+export const ActionRaiseForm = ActionForm;

@@ -5,6 +5,7 @@ import {
   AuditStatus,
   Priority,
   ResponseValue,
+  type Action,
   type Audit,
   type AuditResponse,
   type AuditSection,
@@ -27,6 +28,7 @@ import type {
   AnswerableAuditItem,
 } from "@/types/audit-template";
 import { isDateUploadItem, isGroupItem, isOpenTextItem, isTextAnswerItem } from "@/types/audit-template";
+import type { AuditLinkedAction } from "@/types/audit";
 
 export type AuditWithRelations = Audit & {
   sections: AuditSection[];
@@ -546,7 +548,72 @@ export async function createAuditAction(
   return action;
 }
 
-export function buildAuditSectionPayload(
+export function serializeLinkedAction(action: Action): AuditLinkedAction {
+  return {
+    id: action.id,
+    title: action.title,
+    description: action.description,
+    priority: action.priority,
+    dueDate: toRecordedDateIso(action.dueDate),
+    status: action.status,
+  };
+}
+
+async function getAuditActionsByItemId(
+  auditId: string,
+): Promise<Map<string, Action>> {
+  const actions = await prisma.action.findMany({
+    where: {
+      sourceType: ActionSourceType.AUDIT,
+      sourceRef: auditId,
+      sourceItemId: { not: null },
+    },
+  });
+
+  return new Map(
+    actions
+      .filter((action): action is Action & { sourceItemId: string } =>
+        Boolean(action.sourceItemId),
+      )
+      .map((action) => [action.sourceItemId, action]),
+  );
+}
+
+export type UpdateAuditActionInput = {
+  title: string;
+  description?: string;
+  priority: Priority;
+  dueDate?: string | null;
+};
+
+export async function updateAuditAction(
+  actionId: string,
+  organisationId: string,
+  input: UpdateAuditActionInput,
+): Promise<Action> {
+  const existing = await prisma.action.findFirst({
+    where: {
+      id: actionId,
+      premises: { organisationId },
+    },
+  });
+
+  if (!existing) {
+    throw new Error("Action not found");
+  }
+
+  return prisma.action.update({
+    where: { id: actionId },
+    data: {
+      title: input.title,
+      description: input.description ?? null,
+      priority: input.priority,
+      dueDate: input.dueDate ? new Date(input.dueDate) : null,
+    },
+  });
+}
+
+export async function buildAuditSectionPayload(
   audit: AuditWithRelations,
   sectionId: string,
 ) {
@@ -563,6 +630,7 @@ export function buildAuditSectionPayload(
   }
 
   const items = getApplicableItemsForSection(section, profile);
+  const actionsByItemId = await getAuditActionsByItemId(audit.id);
   const responsesByItemId = Object.fromEntries(
     audit.responses.map((response) => [response.itemId, response]),
   );
@@ -570,14 +638,6 @@ export function buildAuditSectionPayload(
   const sectionRecord = audit.sections.find(
     (entry) => entry.sectionId === sectionId,
   );
-
-  const actionItemIds = audit.responses
-    .filter(
-      (response) =>
-        response.needsAction ||
-        response.response === ResponseValue.ACTION_NEEDED,
-    )
-    .map((response) => response.itemId);
 
   const toResponseRecord = (itemId: string) => {
     const response = responsesByItemId[itemId];
@@ -590,6 +650,11 @@ export function buildAuditSectionPayload(
       notes: response.notes,
       recordedDate: toRecordedDateIso(response.recordedDate),
     };
+  };
+
+  const toLinkedAction = (itemId: string): AuditLinkedAction | null => {
+    const action = actionsByItemId.get(itemId);
+    return action ? serializeLinkedAction(action) : null;
   };
 
   return {
@@ -609,6 +674,7 @@ export function buildAuditSectionPayload(
           subQuestions: item.subQuestions.map((subQuestion) => ({
             ...subQuestion,
             response: toResponseRecord(subQuestion.id),
+            action: toLinkedAction(subQuestion.id),
           })),
         };
       }
@@ -618,10 +684,10 @@ export function buildAuditSectionPayload(
         item: {
           ...item,
           response: toResponseRecord(item.id),
+          action: toLinkedAction(item.id),
         },
       };
     }),
-    actionItemIds,
   };
 }
 

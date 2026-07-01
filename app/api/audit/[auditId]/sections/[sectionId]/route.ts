@@ -21,7 +21,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       );
     }
 
-    const payload = buildAuditSectionPayload(audit, params.sectionId);
+    const payload = await buildAuditSectionPayload(audit, params.sectionId);
 
     return NextResponse.json({ data: payload, error: null });
   } catch (error) {

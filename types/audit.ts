@@ -1,5 +1,14 @@
-import type { AuditSectionStatus, ResponseValue } from "@prisma/client";
+import type { AuditSectionStatus, ResponseValue, ActionStatus, Priority } from "@prisma/client";
 import type { AnswerableResponseType } from "@/types/audit-template";
+
+export type AuditLinkedAction = {
+  id: string;
+  title: string;
+  description: string | null;
+  priority: Priority;
+  dueDate: string | null;
+  status: ActionStatus;
+};
 
 export type AuditSectionSummary = {
   id: string;
@@ -43,6 +52,7 @@ export type AuditItemWithResponse = {
   documentType?: string;
   profileFlag?: string;
   response: AuditResponseRecord | null;
+  action: AuditLinkedAction | null;
 };
 
 export type AuditSubQuestionWithResponse = {
@@ -53,6 +63,7 @@ export type AuditSubQuestionWithResponse = {
   documentType?: string;
   profileFlag?: string;
   response: AuditResponseRecord | null;
+  action: AuditLinkedAction | null;
 };
 
 export type AuditAtomicSectionItem = {
@@ -80,7 +91,6 @@ export type AuditSectionPayload = {
     status: AuditSectionStatus;
   };
   items: AuditSectionItem[];
-  actionItemIds: string[];
 };
 
 export const RESPONSE_LABELS: Record<ResponseValue, string> = {

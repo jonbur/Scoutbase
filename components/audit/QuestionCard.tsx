@@ -32,7 +32,7 @@ type QuestionCardProps = {
     payload: QuestionSavePayload,
   ) => Promise<void>;
   onRaiseAction: (item: AuditItemWithResponse) => void;
-  hasAction: boolean;
+  onEditAction: (item: AuditItemWithResponse) => void;
 };
 
 function normalizeStoredResponse(item: AuditItemWithResponse) {
@@ -125,7 +125,7 @@ export function QuestionCard({
   variant = "default",
   onSave,
   onRaiseAction,
-  hasAction,
+  onEditAction,
 }: QuestionCardProps) {
   const initial = normalizeStoredResponse(item);
   const [response, setResponse] = useState<PrimaryResponseValue | null>(
@@ -149,6 +149,7 @@ export function QuestionCard({
 
   const isOpenTextQuestion = isOpenTextItem(item);
   const isDateQuestion = isDateUploadItem(item);
+  const linkedAction = item.action;
 
   stateRef.current = { response, needsAction, notes, recordedDate };
   onSaveRef.current = onSave;
@@ -436,14 +437,22 @@ export function QuestionCard({
         <p className="mt-3 text-sm text-red-600">{validationError}</p>
       ) : null}
 
-      {(needsAction || hasAction) && response && response !== "NA" && !isOpenTextQuestion && !isDateQuestion ? (
+      {(needsAction || linkedAction) && response && response !== "NA" && !isOpenTextQuestion && !isDateQuestion ? (
         <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
           <p className="text-sm text-amber-900">
-            {hasAction
+            {linkedAction
               ? "An action has been raised for this item."
               : "Raise an action to track the follow-up."}
           </p>
-          {!hasAction ? (
+          {linkedAction ? (
+            <button
+              type="button"
+              onClick={() => onEditAction(item)}
+              className="shrink-0 text-sm font-medium text-amber-900 underline underline-offset-2 hover:text-amber-950"
+            >
+              Edit action
+            </button>
+          ) : needsAction ? (
             <button
               type="button"
               onClick={() => onRaiseAction(item)}

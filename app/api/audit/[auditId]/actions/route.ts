@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Priority } from "@prisma/client";
 import { requireAuthContext } from "@/lib/auth";
-import { createAuditAction } from "@/lib/audit";
+import { createAuditAction, serializeLinkedAction } from "@/lib/audit";
 
 type RouteParams = { params: { auditId: string } };
 
@@ -50,7 +50,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       },
     );
 
-    return NextResponse.json({ data: { action }, error: null });
+    return NextResponse.json({
+      data: serializeLinkedAction(action),
+      error: null,
+    });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to create action";

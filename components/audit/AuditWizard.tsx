@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Priority } from "@prisma/client";
 import type { QuestionSavePayload } from "@/components/audit/QuestionCard";
-import { ActionRaiseForm } from "@/components/audit/ActionRaiseForm";
+import { ActionForm } from "@/components/audit/ActionRaiseForm";
 import { QuestionCard } from "@/components/audit/QuestionCard";
 import { QuestionGroupCard } from "@/components/audit/QuestionGroupCard";
 import { SectionNav } from "@/components/audit/SectionNav";
 import type {
   AuditItemWithResponse,
+  AuditLinkedAction,
   AuditOverview,
   AuditSectionItem,
   AuditSectionPayload,
@@ -20,6 +21,11 @@ type AuditWizardProps = {
   auditId: string;
   initialOverview: AuditOverview;
   initialSectionId: string;
+};
+
+type ActionDialogState = {
+  item: AuditItemWithResponse;
+  existingAction: AuditLinkedAction | null;
 };
 
 function updateSectionItemResponse(
@@ -63,6 +69,47 @@ function updateSectionItemResponse(
   });
 }
 
+function updateSectionItemAction(
+  items: AuditSectionItem[],
+  itemId: string,
+  action: AuditLinkedAction | null,
+): AuditSectionItem[] {
+  return items.map((entry) => {
+    if (entry.kind === "atomic" && entry.item.id === itemId) {
+      return {
+        ...entry,
+        item: {
+          ...entry.item,
+          action,
+        },
+      };
+    }
+
+    if (entry.kind === "group") {
+      const subQuestionIndex = entry.subQuestions.findIndex(
+        (subQuestion) => subQuestion.id === itemId,
+      );
+
+      if (subQuestionIndex === -1) {
+        return entry;
+      }
+
+      const subQuestions = [...entry.subQuestions];
+      subQuestions[subQuestionIndex] = {
+        ...subQuestions[subQuestionIndex],
+        action,
+      };
+
+      return {
+        ...entry,
+        subQuestions,
+      };
+    }
+
+    return entry;
+  });
+}
+
 export function AuditWizard({
   premisesId,
   auditId,
@@ -75,10 +122,9 @@ export function AuditWizard({
   const [sectionData, setSectionData] = useState<AuditSectionPayload | null>(null);
   const [loadingSection, setLoadingSection] = useState(true);
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
-  const [actionItem, setActionItem] = useState<AuditItemWithResponse | null>(null);
-  const [raisingAction, setRaisingAction] = useState(false);
+  const [actionDialog, setActionDialog] = useState<ActionDialogState | null>(null);
+  const [savingAction, setSavingAction] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [actionItemIds, setActionItemIds] = useState<string[]>([]);
 
   const refreshOverview = useCallback(async () => {
     const response = await fetch(`/api/audit/${auditId}`);
@@ -103,7 +149,6 @@ export function AuditWizard({
       }
 
       setSectionData(result.data);
-      setActionItemIds(result.data.actionItemIds ?? []);
     } catch (loadError) {
       setError(
         loadError instanceof Error ? loadError.message : "Failed to load section",
@@ -174,14 +219,6 @@ export function AuditWizard({
         };
       });
 
-      if (payload.needsAction) {
-        setActionItemIds((current) =>
-          current.includes(itemId) ? current : [...current, itemId],
-        );
-      } else {
-        setActionItemIds((current) => current.filter((id) => id !== itemId));
-      }
-
       void refreshOverview();
     } catch (saveError) {
       throw saveError;
@@ -190,45 +227,70 @@ export function AuditWizard({
     }
   }
 
-  async function handleRaiseAction(input: {
+  async function handleActionSubmit(input: {
     title: string;
     description: string;
     priority: Priority;
     dueDate: string;
   }) {
-    if (!actionItem) return;
+    if (!actionDialog) return;
 
-    setRaisingAction(true);
+    setSavingAction(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/audit/${auditId}/actions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: input.title,
-          description: input.description || null,
-          priority: input.priority,
-          dueDate: input.dueDate || null,
-          itemId: actionItem.id,
-          sectionId: sectionData?.section.id ?? activeSectionId,
-        }),
-      });
+      const isEditing = Boolean(actionDialog.existingAction);
+      const response = await fetch(
+        isEditing
+          ? `/api/actions/${actionDialog.existingAction!.id}`
+          : `/api/audit/${auditId}/actions`,
+        {
+          method: isEditing ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            isEditing
+              ? {
+                  title: input.title,
+                  description: input.description || null,
+                  priority: input.priority,
+                  dueDate: input.dueDate || null,
+                }
+              : {
+                  title: input.title,
+                  description: input.description || null,
+                  priority: input.priority,
+                  dueDate: input.dueDate || null,
+                  itemId: actionDialog.item.id,
+                  sectionId: sectionData?.section.id ?? activeSectionId,
+                },
+          ),
+        },
+      );
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error ?? "Failed to raise action");
+        throw new Error(result.error ?? "Failed to save action");
       }
 
-      setActionItemIds((current) =>
-        current.includes(actionItem.id) ? current : [...current, actionItem.id],
-      );
-      setActionItem(null);
-      await loadSection(activeSectionId);
+      const linkedAction = result.data as AuditLinkedAction;
+
+      setSectionData((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          items: updateSectionItemAction(
+            current.items,
+            actionDialog.item.id,
+            linkedAction,
+          ),
+        };
+      });
+
+      setActionDialog(null);
       await refreshOverview();
     } finally {
-      setRaisingAction(false);
+      setSavingAction(false);
     }
   }
 
@@ -297,7 +359,6 @@ export function AuditWizard({
                     group={entry}
                     sectionId={sectionData.section.id}
                     savingItemId={savingItemId}
-                    actionItemIds={actionItemIds}
                     onSave={async (itemId, sectionId, payload) => {
                       try {
                         await saveQuestion(itemId, sectionId, payload);
@@ -310,7 +371,15 @@ export function AuditWizard({
                         throw saveError;
                       }
                     }}
-                    onRaiseAction={setActionItem}
+                    onRaiseAction={(item) =>
+                      setActionDialog({ item, existingAction: null })
+                    }
+                    onEditAction={(item) =>
+                      setActionDialog({
+                        item,
+                        existingAction: item.action,
+                      })
+                    }
                   />
                 ) : (
                   <QuestionCard
@@ -318,7 +387,6 @@ export function AuditWizard({
                     item={entry.item}
                     sectionId={sectionData.section.id}
                     saving={savingItemId === entry.item.id}
-                    hasAction={actionItemIds.includes(entry.item.id)}
                     onSave={async (itemId, sectionId, payload) => {
                       try {
                         await saveQuestion(itemId, sectionId, payload);
@@ -331,7 +399,15 @@ export function AuditWizard({
                         throw saveError;
                       }
                     }}
-                    onRaiseAction={setActionItem}
+                    onRaiseAction={(item) =>
+                      setActionDialog({ item, existingAction: null })
+                    }
+                    onEditAction={(item) =>
+                      setActionDialog({
+                        item,
+                        existingAction: item.action,
+                      })
+                    }
                   />
                 ),
               )}
@@ -340,12 +416,13 @@ export function AuditWizard({
         </section>
       </div>
 
-      {actionItem ? (
-        <ActionRaiseForm
-          item={actionItem}
-          saving={raisingAction}
-          onSubmit={handleRaiseAction}
-          onCancel={() => setActionItem(null)}
+      {actionDialog ? (
+        <ActionForm
+          item={actionDialog.item}
+          existingAction={actionDialog.existingAction}
+          saving={savingAction}
+          onSubmit={handleActionSubmit}
+          onCancel={() => setActionDialog(null)}
         />
       ) : null}
     </div>

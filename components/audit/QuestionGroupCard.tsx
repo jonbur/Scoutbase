@@ -12,13 +12,13 @@ type QuestionGroupCardProps = {
   group: AuditGroupSectionItem;
   sectionId: string;
   savingItemId: string | null;
-  actionItemIds: string[];
   onSave: (
     itemId: string,
     sectionId: string,
     payload: QuestionSavePayload,
   ) => Promise<void>;
   onRaiseAction: (item: AuditItemWithResponse) => void;
+  onEditAction: (item: AuditItemWithResponse) => void;
 };
 
 function toQuestionItem(
@@ -33,6 +33,7 @@ function toQuestionItem(
     documentType: subQuestion.documentType,
     profileFlag: subQuestion.profileFlag,
     response: subQuestion.response,
+    action: subQuestion.action,
   };
 }
 
@@ -40,9 +41,9 @@ export function QuestionGroupCard({
   group,
   sectionId,
   savingItemId,
-  actionItemIds,
   onSave,
   onRaiseAction,
+  onEditAction,
 }: QuestionGroupCardProps) {
   const questionItems = useMemo(
     () => group.subQuestions.map((subQuestion) => toQuestionItem(subQuestion)),
@@ -66,9 +67,9 @@ export function QuestionGroupCard({
             sectionId={sectionId}
             variant="sub"
             saving={savingItemId === item.id}
-            hasAction={actionItemIds.includes(item.id)}
             onSave={onSave}
             onRaiseAction={onRaiseAction}
+            onEditAction={onEditAction}
           />
         ))}
       </div>
