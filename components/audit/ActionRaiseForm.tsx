@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { Priority } from "@prisma/client";
+import type { ActionStatus, Priority } from "@prisma/client";
 import type { AuditItemWithResponse, AuditLinkedAction } from "@/types/audit";
+import { ACTION_STATUS_LABELS } from "@/types/action";
 import { Button } from "@/components/ui/form";
 
 const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
@@ -11,16 +12,20 @@ const PRIORITY_OPTIONS: { value: Priority; label: string }[] = [
   { value: "LOW", label: "Low" },
 ];
 
+type ActionFormSubmitInput = {
+  title: string;
+  description: string;
+  priority: Priority;
+  dueDate: string;
+  status?: ActionStatus;
+};
+
 type ActionFormProps = {
   item: AuditItemWithResponse;
   existingAction?: AuditLinkedAction | null;
   saving: boolean;
-  onSubmit: (input: {
-    title: string;
-    description: string;
-    priority: Priority;
-    dueDate: string;
-  }) => Promise<void>;
+  showStatus?: boolean;
+  onSubmit: (input: ActionFormSubmitInput) => Promise<void>;
   onCancel: () => void;
 };
 
@@ -28,6 +33,7 @@ export function ActionForm({
   item,
   existingAction = null,
   saving,
+  showStatus = false,
   onSubmit,
   onCancel,
 }: ActionFormProps) {
@@ -39,6 +45,9 @@ export function ActionForm({
   );
   const [priority, setPriority] = useState<Priority>(
     existingAction?.priority ?? "MEDIUM",
+  );
+  const [status, setStatus] = useState<ActionStatus>(
+    existingAction?.status ?? "OPEN",
   );
   const [dueDate, setDueDate] = useState(existingAction?.dueDate ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +67,7 @@ export function ActionForm({
         description: description.trim(),
         priority,
         dueDate,
+        ...(showStatus ? { status } : {}),
       });
     } catch (submitError) {
       setError(
@@ -114,6 +124,31 @@ export function ActionForm({
               placeholder="What needs to be done?"
             />
           </div>
+
+          {showStatus ? (
+            <div>
+              <label
+                htmlFor="action-status"
+                className="block text-sm font-medium text-slate-700"
+              >
+                Status
+              </label>
+              <select
+                id="action-status"
+                value={status}
+                onChange={(event) =>
+                  setStatus(event.target.value as ActionStatus)
+                }
+                className="mt-1 w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              >
+                {Object.entries(ACTION_STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
           <div>
             <span className="block text-sm font-medium text-slate-700">Priority</span>
