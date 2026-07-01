@@ -105,6 +105,7 @@ export function QuestionCard({
   const stateRef = useRef({ response: initial.response, needsAction: initial.needsAction, notes: initial.notes });
   const onSaveRef = useRef(onSave);
   const itemRef = useRef(item);
+  const notesFocusedRef = useRef(false);
 
   const isTextQuestion = isTextAnswerItem(item);
   const isDateQuestion = isDateUploadItem(item);
@@ -117,7 +118,9 @@ export function QuestionCard({
     const next = normalizeStoredResponse(item);
     setResponse(next.response);
     setNeedsAction(next.needsAction);
-    setNotes(next.notes);
+    if (!notesFocusedRef.current) {
+      setNotes(next.notes);
+    }
     setValidationError(null);
   }, [item.id, storedResponseKey(item)]);
 
@@ -182,7 +185,7 @@ export function QuestionCard({
 
     debounceRef.current = setTimeout(() => {
       void persist(next);
-    }, 400);
+    }, 800);
   }
 
   async function handleResponseChange(nextResponse: PrimaryResponseValue) {
@@ -236,7 +239,13 @@ export function QuestionCard({
     }
   }
 
+  function handleNotesFocus() {
+    notesFocusedRef.current = true;
+  }
+
   async function handleNotesBlur() {
+    notesFocusedRef.current = false;
+
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
@@ -295,10 +304,10 @@ export function QuestionCard({
             id={`notes-${item.id}`}
             rows={3}
             value={notes}
-            disabled={saving}
             onChange={(event) => handleNotesChange(event.target.value)}
+            onFocus={handleNotesFocus}
             onBlur={handleNotesBlur}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:opacity-50"
+            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
             placeholder={
               isDateQuestion
                 ? "e.g. 12 March 2025 — certificate on file in the document vault"
@@ -328,10 +337,10 @@ export function QuestionCard({
                 id={`notes-${item.id}`}
                 rows={3}
                 value={notes}
-                disabled={saving}
                 onChange={(event) => handleNotesChange(event.target.value)}
+                onFocus={handleNotesFocus}
                 onBlur={handleNotesBlur}
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:opacity-50"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
                 placeholder="Describe what is in place, any evidence, or context for your answer"
               />
             </div>

@@ -178,7 +178,7 @@ export function AuditWizard({
         setActionItemIds((current) => current.filter((id) => id !== itemId));
       }
 
-      await refreshOverview();
+      void refreshOverview();
     } catch (saveError) {
       throw saveError;
     } finally {
